@@ -17,9 +17,9 @@ def _random_decimal(minimum: Decimal, maximum: Decimal, digits: int = 2) -> Deci
 
 class DecimalRange:
 
-    def __init__(self, _lower: Decimal, _upper: Decimal):
-        self._lower = _lower
-        self._upper = _upper
+    def __init__(self, _lower: SupportsDecimal, _upper: SupportsDecimal):
+        self._lower = Decimal(_lower)
+        self._upper = Decimal(_upper)
         self._adjust_order()
 
     @property
@@ -27,8 +27,8 @@ class DecimalRange:
         return self._lower
 
     @lower.setter
-    def lower(self, new_value: Decimal) -> None:
-        self._lower = new_value
+    def lower(self, new_value: SupportsDecimal) -> None:
+        self._lower = Decimal(new_value)
         self._adjust_order()
 
     @property
@@ -36,8 +36,8 @@ class DecimalRange:
         return self._upper
 
     @upper.setter
-    def upper(self, new_value: Decimal) -> None:
-        self._upper = new_value
+    def upper(self, new_value: SupportsDecimal) -> None:
+        self._upper = Decimal(new_value)
         self._adjust_order()
 
     def get_random_value(self) -> Decimal:

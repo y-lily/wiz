@@ -26,7 +26,7 @@ class TestDynamicValue:
 
     @pytest.fixture
     def mock_source(self) -> MockValue:
-        return MockValue(Decimal('10'))
+        return MockValue(Decimal(10))
 
     def test_value_changes_if_source_value_changes(self, mock_source: MockValue) -> None:
         dynamic_value = DynamicValue(mock_source)
@@ -58,13 +58,13 @@ class TestConstValue:
 
     def test_instances_from_equal_int_and_decimal_are_same(self) -> None:
         from_int = ConstValue(10)
-        from_decimal = ConstValue(Decimal('10'))
+        from_decimal = ConstValue(Decimal(10))
 
         assert from_int is from_decimal
 
     def test_instances_with_unequal_values_are_not_same(self) -> None:
-        first = ConstValue(Decimal('1'))
-        second = ConstValue(Decimal('2'))
+        first = ConstValue(Decimal(1))
+        second = ConstValue(Decimal(2))
 
         assert first is not second
 
@@ -75,7 +75,7 @@ class TestModifier:
     def base_value(self) -> MockValue:
         return MockValue(Decimal(10))
 
-    @pytest.mark.parametrize('base_arguments_of_value_ten', (lazy_fixture('base_value'), 10, 10.0, '10', '10.0', Decimal(10.0), DecimalTuple(0, (1, 0, 0), -1)))
+    @pytest.mark.parametrize('base_arguments_of_value_ten', (lazy_fixture('base_value'), 10, 10.0, '10', '10.0', Decimal('10.0'), DecimalTuple(0, (1, 0, 0), -1)))
     def test_decimal_bases_return_proper_value(self, base_arguments_of_value_ten: Any) -> None:
         assert Modifier(base_arguments_of_value_ten,
                         Modification.FLAT).value == Decimal(10)

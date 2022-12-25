@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import ClassVar, TypeAlias, cast, get_args, runtime_checkable
 
 from abc import abstractproperty
 from decimal import Decimal
 from enum import Enum
-from typing import Literal, Protocol
+from typing import (ClassVar, Literal, Protocol, TypeAlias, cast, get_args,
+                    runtime_checkable)
 
 from lib.decimal_tools import SupportsDecimal
 
