@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal, Protocol
 
-from lib.supports_decimal import SupportsDecimal
+from lib.decimal_tools import SupportsDecimal
 
 
 @runtime_checkable
