@@ -1,11 +1,16 @@
-from contextlib import suppress
-import pytest
-
-from pytest_lazyfixture import lazy_fixture
+# from contextlib import suppress
 from decimal import Decimal
-from src.game.stats.modifier import Modification, Modifier
-from src.game.stats.stat_ import BoundedStat, CarryingCapacity, LoadStatus, Stat, Resist, Resource, ResourceDrained, ResourceRegeneration
+
+import pytest
+from pytest_lazyfixture import lazy_fixture
 from pytest_mock import MockFixture
+
+from src.game.stats.modifier import Modification, Modifier
+from src.game.stats.stat_ import (BoundedStat, CarryingCapacity, LoadStatus,
+                                  Resist, Resource, Stat)
+
+# from src.game.stats.stat_ import ResourceDrained
+from tests.game.mock_value import MockValue
 
 
 class TestStat:
@@ -382,8 +387,9 @@ class TestResource:
     def test_current_cannot_be_decreased_below_lower_bound(self) -> None:
         sp = Resource(_base=10, _lower_bound=0)
 
-        with suppress(ResourceDrained):
-            sp.current -= 20
+        # with suppress(ResourceDrained):
+        #     sp.current -= 20
+        sp.current -= 20
 
         assert sp.current == 0
 
@@ -419,7 +425,7 @@ class TestResource:
 
         assert expected == actual
 
-    def test_removing_positive_modifier_changex_current_if_total_becomes_less_than_current(self, hp: Resource) -> None:
+    def test_removing_positive_modifier_changes_current_if_total_becomes_less_than_current(self, hp: Resource) -> None:
         expected = hp.current
         buff = Modifier(10, Modification.FLAT)
         hp.add_modifier(buff)
@@ -430,13 +436,83 @@ class TestResource:
         assert expected == actual
 
     def test_change_of_modifier_source_affects_current(self, hp: Resource) -> None:
-        source = Resource(10)
+        source = MockValue(Decimal(10))
         buff = Modifier(source, Modification.FLAT)
         hp.add_modifier(buff)
 
         expected = hp.current + 1
         hp.current += 5
-        source.base = Decimal(1)
+        source.value = Decimal(1)
         actual = hp.current
 
         assert expected == actual
+
+    # def test_constructing_with_base_equal_to_zero_does_not_raise_resource_drained(self) -> None:
+    #     _ = Resource(Decimal(0))
+
+    # @pytest.mark.parametrize('decrement', (10, 11, 100, Decimal('10.01')))
+    # def test_reducing_current_to_zero_raises_resource_drained(self, hp: Resource, decrement: Decimal | int) -> None:
+    #     with pytest.raises(ResourceDrained):
+    #         hp.current -= decrement
+
+    # @pytest.mark.parametrize('decrement', (1, Decimal('1.99')))
+    # def test_reducing_current_to_above_zero_does_not_raise(self, decrement: Decimal | int) -> None:
+    #     mp = Resource(Decimal(2))
+    #     mp.current -= decrement
+
+    # def test_reducing_current_from_zero_to_zero_does_not_raise(self, hp: Resource) -> None:
+    #     with pytest.raises(ResourceDrained):
+    #         hp.current -= 10
+
+    #     hp.current -= 1  # Should not raise since current is already 0.
+
+    # def test_increasing_drained_current_resets_drained_status(self, hp: Resource) -> None:
+    #     with pytest.raises(ResourceDrained):
+    #         hp.current -= 10
+
+    #     hp.current += 1
+
+    #     with pytest.raises(ResourceDrained):
+    #         hp.current -= 1
+
+    # def test_regenerating_zero_does_not_reset_drained_status(self) -> None:
+    #     sp = Resource(_base=1, _regeneration=0)
+
+    #     with pytest.raises(ResourceDrained):
+    #         sp.current -= 1
+
+    #     sp.regenerate()
+    #     sp.current -= 1
+
+    # @pytest.mark.parametrize('decrement', (10, 100, Decimal('10.01')))
+    # def test_reducing_base_which_results_in_reducing_current_to_zero_raises_resource_drained(self, hp: Resource, decrement: Decimal | int) -> None:
+    #     with pytest.raises(ResourceDrained):
+    #         hp.base -= decrement
+
+    # @pytest.mark.parametrize('decrement', (1, Decimal('1.99')))
+    # def test_reducing_base_which_results_in_reducing_current_to_above_zero_does_not_raise(self, decrement: Decimal | int) -> None:
+    #     mp = Resource(Decimal(2))
+    #     mp.base -= decrement
+
+    # def test_adding_modifiers_which_results_in_reducing_current_to_zero_raises_resource_drained(self, hp: Resource) -> None:
+    #     with pytest.raises(ResourceDrained):
+    #         hp.add_modifier(Modifier(-10, Modification.FLAT))
+
+    # def test_removing_modifiers_which_results_in_reducing_current_to_zero_raises_resource_drained(self) -> None:
+    #     mp = Resource(0)
+    #     buff = Modifier(1, Modification.FLAT)
+    #     mp.add_modifier(buff)
+    #     mp.current += 1
+
+    #     with pytest.raises(ResourceDrained):
+    #         mp.remove_modifier(buff)
+
+    # def test_changing_modifier_source_which_results_in_reducing_current_to_zero_raises_resource_drained(self) -> None:
+    #     source = MockValue(Decimal(1))
+    #     modifier = Modifier(source, Modification.FLAT)
+    #     mp = Resource(0)
+    #     mp.add_modifier(modifier)
+    #     mp.current += 1
+
+    #     with pytest.raises(ResourceDrained):
+    #         source.value = 0

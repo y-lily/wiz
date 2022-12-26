@@ -4,22 +4,9 @@ from typing import Any
 import pytest
 from pytest_lazyfixture import lazy_fixture
 
-from src.game.stats.modifier import (ConstValue, DynamicValue, HasValue,
-                                     Modification, Modifier)
-
-
-class MockValue(HasValue):
-
-    def __init__(self, _value: Decimal) -> None:
-        self._value = _value
-
-    @property
-    def value(self) -> Decimal:
-        return self._value
-
-    @value.setter
-    def value(self, new_value: Decimal) -> None:
-        self._value = new_value
+from src.game.stats.modifier import (
+    ConstValue, DynamicValue, Modification, Modifier)
+from tests.game.mock_value import MockValue
 
 
 class TestDynamicValue:

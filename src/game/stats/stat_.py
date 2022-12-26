@@ -239,8 +239,8 @@ class ResourceRegeneration(SecondaryStat):
                          _upper_bound=None, _modified_upper_bound=None)
 
 
-class ResourceDrained(Exception):
-    pass
+# class ResourceDrained(Exception):
+#     pass
 
 
 class Resource(SecondaryStat):
@@ -259,42 +259,42 @@ class Resource(SecondaryStat):
             _regeneration, ResourceRegeneration) else ResourceRegeneration(_regeneration)
         self._current = self._base
 
-        self._aware_of_resource_drain = False if self._current > Decimal(
-            0) else True
+        # self._aware_of_resource_drain = False if self._current > Decimal(
+        #     0) else True
 
     def __str__(self) -> str:
         return f"{self.current}/{self.value}"
 
     @property
     def current(self) -> Decimal:
-        # Required because values of modifiers may change.
+        #     # Required because values of modifiers may change.
         self._update_current()
         return self._current
 
     @current.setter
     def current(self, new_value: SupportsDecimal) -> None:
         self._current = Decimal(new_value)
-        self._update_current()
+        # self._update_current()
 
     @property
     def regeneration(self) -> ResourceRegeneration:
         return self._regeneration
 
-    @override
-    def add_modifier(self, modifier: Modifier) -> None:
-        super().add_modifier(modifier)
-        self._update_current()
+    # @override
+    # def add_modifier(self, modifier: Modifier) -> None:
+    #     super().add_modifier(modifier)
+    #     self._update_current()
 
-    @override
-    def calculate_value_with_temporary_modifiers(self, temporary_modifiers: list[Modifier]) -> Decimal:
-        modifiers = self._modifiers + temporary_modifiers
-        modifiers.sort(key=lambda m: m.order)
-        value = self._calculate_modified_value(modifiers)
+    # @override
+    # def calculate_value_with_temporary_modifiers(self, temporary_modifiers: list[Modifier]) -> Decimal:
+    #     modifiers = self._modifiers + temporary_modifiers
+    #     modifiers.sort(key=lambda m: m.order)
+    #     value = self._calculate_modified_value(modifiers)
 
-        self._current = min(self._current, value)
-        self._update_current()
+    #     self._current = min(self._current, value)
+    #     self._update_current()
 
-        return self._adjusted_value(value)
+    #     return self._adjusted_value(value)
 
     def grow(self) -> Decimal:
         before = self.base
@@ -314,31 +314,31 @@ class Resource(SecondaryStat):
 
         return after - before
 
-    @override
-    def remove_modifier(self, modifier: Modifier) -> None:
-        super().remove_modifier(modifier)
-        self._update_current()
+    # @override
+    # def remove_modifier(self, modifier: Modifier) -> None:
+    #     super().remove_modifier(modifier)
+        # self._update_current()
 
-    @override
-    def remove_source(self, source: object) -> None:
-        super().remove_source(source)
-        self._update_current()
+    # @override
+    # def remove_source(self, source: object) -> None:
+    #     super().remove_source(source)
+        # self._update_current()
 
-    @override
-    def _adjust_base(self) -> None:
-        super()._adjust_base()
-        self._update_current()
+    # @override
+    # def _adjust_base(self) -> None:
+    #     super()._adjust_base()
+        # self._update_current()
 
     def _update_current(self) -> None:
         self._current = self._adjust_for_bounds(
             self._current, self._lower_bound, self.value)
 
-        if self._lower_bound is not None \
-                and self._current <= self._lower_bound \
-                and not self._aware_of_resource_drain:
-            self._aware_of_resource_drain = True
-            raise ResourceDrained
+        # if self._lower_bound is not None \
+        #         and self._current <= self._lower_bound \
+        #         and not self._aware_of_resource_drain:
+        #     self._aware_of_resource_drain = True
+        #     raise ResourceDrained
 
-        if self._lower_bound is not None \
-                and self._current > self._lower_bound:
-            self._aware_of_resource_drain = False
+        # if self._lower_bound is not None \
+        #         and self._current > self._lower_bound:
+        #     self._aware_of_resource_drain = False
