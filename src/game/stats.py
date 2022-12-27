@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod, abstractproperty
 from contextlib import suppress
 from decimal import Decimal
 from enum import Enum
-from typing import (ClassVar, Literal, Protocol, TypeAlias, cast, get_args, overload,
-                    runtime_checkable)
+from typing import (Any, ClassVar, ItemsView, Iterator, Literal, Mapping, Protocol,
+                    TypeAlias, TypeVar, TypedDict, get_args, overload, runtime_checkable)
 
 from typing_extensions import override
 
@@ -160,13 +160,13 @@ class Modifier(HasValue):
         assert self._modification.value in ORDER_VALUES, (
             "Inappropriate modification value, expected to be in"
             f"{str(ORDER_VALUES)}, but became {self._modification.value}.")
-        self._order = _order if _order is not None else self._modification.value
+        self._order: Order = _order if _order is not None else self._modification.value
 
         self._source = _source
 
     @property
     def order(self) -> Order:
-        return cast(Order, self._order)
+        return self._order
 
     @property
     def source(self) -> object:
@@ -333,6 +333,13 @@ class SecondaryStat(BoundedStat):
         super().__init__(_base, _lower_bound, _upper_bound, _modified_upper_bound)
 
 
+class Defence(SecondaryStat):
+
+    def __init__(self, _base: SupportsDecimal) -> None:
+        super().__init__(_base, _lower_bound=None,
+                         _upper_bound=None, _modified_upper_bound=None)
+
+
 class Resist(SecondaryStat):
 
     def __init__(self, _base: SupportsDecimal, _base_max: SupportsDecimal | None = None,
@@ -353,6 +360,12 @@ class Resist(SecondaryStat):
 
         assert after - before >= 0
         return after - before
+
+
+class DamageReduction(SecondaryStat):
+
+    def __init__(self, _base: SupportsDecimal) -> None:
+        super().__init__(_base, _lower_bound=0, _upper_bound=None, _modified_upper_bound=None)
 
 
 class LoadStatus(Enum):
@@ -517,6 +530,17 @@ class Resource(SecondaryStat):
         #     self._aware_of_resource_drain = False
 
 
+class Armour(Resource):
+
+    def __init__(self, _base: SupportsDecimal, _base_max: SupportsDecimal | None = None,
+                 _regeneration: SupportsDecimal | ResourceRegeneration = Decimal(
+                     0),
+                 _growth: SupportsDecimal = Decimal(0), _growth_max: SupportsDecimal = Decimal(0)) -> None:
+
+        super().__init__(_base, _base_max, _regeneration, _growth, _growth_max,
+                         _lower_bound=None, _upper_bound=None, _modified_upper_bound=None)
+
+
 class Skill(PrimaryStat, ExponentialLevelSystem):
 
     def __init__(self, _base: SupportsDecimal, _scale: SupportsDecimal,
@@ -557,3 +581,269 @@ class Skill(PrimaryStat, ExponentialLevelSystem):
     def _set_base(self, new_value: SupportsDecimal) -> None:
         super()._set_base(new_value)
         self._refresh_xp()
+
+
+class PrimaryStatType(Enum):
+
+    STRENGTH = "STR"
+    WILL = "WIL"
+    INTELLIGENCE = "INT"
+    DEXTERITY = "DEX"
+    SPEED = "SPD"
+    VITALITY = "VIT"
+    CHARISMA = "CHA"
+    PERCEPTION = "PER"
+
+
+class SkillType(Enum):
+
+    SINGLE_HANDED = "Single-handed"
+    RANGED = "Ranged"
+    TWO_HANDED = "Two-handed"
+    DUAL_WIELDING = "Dual wielding"
+    DEFENDING = "Defending"
+    ORATORY = "Oratory"
+    WIZARDRY = "Wizardry"
+    AXE = "Axe"
+    BLUNT = "Blunt"
+    GREATSWORD = "Greatsword"
+    SWORD = "Sword"
+    POLEARM = "Polearm"
+    DAGGER = "Dagger"
+    STAFF_WAND = "Staff and wand"
+    THROWING = "Throwing"
+    BOW = "Bow"
+    MARTIAL_ARTS = "Martial arts"
+    SHIELD = "Shield"
+    ARMOURER = "Armourer"
+    FIREARM = "Firearm"
+    DIVINITY = "Divinity"
+    PRIMEVALITY = "Primevality"
+    SORCERY = "Sorcery"
+    NECROMANCY = "Necromancy"
+    ILLUSIONS = "Illusions"
+    LOCKPICKING = "Lockpicking"
+    PICKPOCKETING = "Pickpocketing"
+    STEALTH = "Stealth"
+    PARRYING = "Parrying"
+    CRITICAL = "Critical"
+    ALCHEMY = "Alchemy"
+    ENGINEERING = "Engineering"
+    MUSIC = "Music"
+    ARTEFACTS = "Artefacts"
+    DIPLOMACY = "Diplomacy"
+    LORE_KNOWLEDGE = "Lore knowledge"
+    SCOUTING = "Scouting"
+    SWIMMING = "Swimming"
+    BEAR = "Bear"
+    LAMB = "Lamb"
+    CROW = "Crow"
+    FOX = "Fox"
+    FALCON = "Falcon"
+    TORTOISE = "Tortoise"
+    PANDA = "Panda"
+    BAT = "Bat"
+
+    @staticmethod
+    def mastery_skills() -> tuple[SkillType, ...]:
+        return (SkillType.BEAR, SkillType.LAMB, SkillType.CROW, SkillType.FOX,
+                SkillType.FALCON, SkillType.TORTOISE, SkillType.PANDA, SkillType.BAT)
+
+
+class DamageSource(Enum):
+
+    PHYSICAL = "Physical"
+
+    AIR = "Air"
+    EARTH = "Earth"
+    FIRE = "Fire"
+    WATER = "Water"
+
+    CURSE = "Curse"
+    DISEASE = "Disease"
+    MENTAL = "Mental"
+
+
+class SecondaryStatType(Enum):
+
+    ACCURACY = "ACC"
+    ACTION_SPEED = "ACTSP"
+    ATTACK_SPEED = "ASP"
+    ATTRACTIVENESS = "ATTRACT"
+    CRIT_CHANCE = "CCH"
+    CRIT_DMG = "CDMG"
+    DODGING = "DDG"
+    INITIATIVE = "INIT"
+    PENETRATION = "PEN"
+    PERSUASION = "PRS"
+    SPELLCASTING = "SPL"
+
+
+class ResourceType(Enum):
+
+    HIT_POINTS = "HP"
+    STAMINA_POINTS = "SP"
+    MANA_POINTS = "MP"
+
+
+STT = TypeVar("STT", PrimaryStatType, SkillType,
+              SecondaryStatType, ResourceType, DamageSource)
+ST = TypeVar("ST", bound=Stat)
+
+
+class StatBlock(Mapping[STT, ST]):
+
+    def __init__(self, _stats: dict[STT, ST]) -> None:
+        self._stats: dict[STT, ST] = _stats
+
+    def __getitem__(self, __key: STT) -> ST:
+        return self._stats[__key]
+
+    def __iter__(self) -> Iterator[STT]:
+        return self._stats.__iter__()
+
+    def __len__(self) -> int:
+        return len(self._stats)
+
+    def items(self) -> ItemsView[STT, ST]:
+        return self._stats.items()
+
+    def remove_source(self, source: object) -> None:
+        for stat_ in self._stats.values():
+            stat_.remove_source(source)
+
+    def setdefault(self, key: STT, value: ST) -> ST:
+        return self._stats.setdefault(key, value)
+
+
+class PrimaryStatBlock(StatBlock[PrimaryStatType, PrimaryStat]):
+    pass
+
+
+class SkillBlock(StatBlock[SkillType, Skill]):
+    pass
+
+
+class SecondaryStatBlock(StatBlock[SecondaryStatType, SecondaryStat]):
+    pass
+
+
+class ResourceBlock(StatBlock[ResourceType, Resource]):
+    pass
+
+
+class ArmourBlock(StatBlock[DamageSource, Armour]):
+    pass
+
+
+class DamageReductionBlock(StatBlock[DamageSource, DamageReduction]):
+    pass
+
+
+class DefenceBlock(StatBlock[DamageSource, Defence]):
+    pass
+
+
+class ResistBlock(StatBlock[DamageSource, Resist]):
+    pass
+
+
+class StatBlockType(Enum):
+
+    PRIMARY_STATS = "primary_stats"
+    SKILLS = "skills"
+    SECONDARY_STATS = "secondary_stats"
+    RESOURCES = "resources"
+    ARMOUR = "armour"
+    DAMAGE_REDUCTION = "damage_reduction"
+    DEFENCE = "defence"
+    RESIST = "resist"
+
+
+class StatSheet(Mapping[StatBlockType, StatBlock[Any, Any]]):
+
+    def __init__(self,
+                 _primary_stats: PrimaryStatBlock,
+                 _skills: SkillBlock,
+                 _secondary_stats: SecondaryStatBlock,
+                 _resources: ResourceBlock,
+                 _armour: ArmourBlock,
+                 _damage_reduction: DamageReductionBlock,
+                 _defence: DefenceBlock,
+                 _resist: ResistBlock, **kwargs: object) -> None:
+
+        self._stats: dict[StatBlockType, StatBlock[Any, Any]] = {StatBlockType.PRIMARY_STATS: _primary_stats,
+                                                                 StatBlockType.SKILLS: _skills,
+                                                                 StatBlockType.SECONDARY_STATS: _secondary_stats,
+                                                                 StatBlockType.RESOURCES: _resources,
+                                                                 StatBlockType.ARMOUR: _armour,
+                                                                 StatBlockType.DAMAGE_REDUCTION: _damage_reduction,
+                                                                 StatBlockType.DEFENCE: _defence,
+                                                                 StatBlockType.RESIST: _resist}
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.PRIMARY_STATS]) -> PrimaryStatBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.SKILLS]) -> SkillBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.SECONDARY_STATS]) -> SecondaryStatBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.RESOURCES]) -> ResourceBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.ARMOUR]) -> ArmourBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.DAMAGE_REDUCTION]) -> DamageReductionBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.DEFENCE]) -> DefenceBlock: ...
+
+    @overload
+    def __getitem__(
+        self, sbt: Literal[StatBlockType.RESIST]) -> ResistBlock: ...
+
+    def __getitem__(self, sbt: StatBlockType) -> StatBlock[Any, Any]:
+        return self._stats[sbt]
+
+    def __iter__(self) -> Iterator[StatBlockType]:
+        return self._stats.__iter__()
+
+    def __len__(self) -> int:
+        return self._stats.__len__()
+
+
+class StatDraft(TypedDict):
+
+    _base: SupportsDecimal
+    _base_max: SupportsDecimal | None
+    _lower_bound: SupportsDecimal | None
+    _upper_bound: SupportsDecimal | None
+    _modified_upper_bound: SupportsDecimal | None
+    _scale: SupportsDecimal
+    _regeneration: SupportsDecimal | ResourceRegeneration
+    _growth: SupportsDecimal
+    _growth_max: SupportsDecimal
+
+
+class StatSheetDraft(TypedDict):
+
+    _primary_stats: dict[str, StatDraft]
+    _skills: dict[str, StatDraft]
+    _secondary_stats: dict[str, StatDraft]
+    _resources: dict[str, StatDraft]
+
+    _armour: dict[str, StatDraft]
+    _damage_reduction: dict[str, StatDraft]
+    _defence: dict[str, StatDraft]
+    _resist: dict[str, StatDraft]

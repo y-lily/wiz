@@ -119,7 +119,7 @@ class TestStat:
 
     @pytest.fixture(scope="function", autouse=True)
     def hide_abstract_methods(self, mocker: MockFixture) -> None:
-        mocker.patch('src.game.stats.stat_.Stat.__abstractmethods__', set())
+        mocker.patch('src.game.stats.Stat.__abstractmethods__', set())
 
     @pytest.fixture
     def vitality(self) -> Stat:
@@ -180,7 +180,7 @@ class TestStat:
         vitality.add_modifier(modifier)
 
         before = vitality.value
-        mocker.patch('src.game.stats.modifier.Modifier.value',
+        mocker.patch('src.game.stats.Modifier.value',
                      return_value=5, new_callable=mocker.PropertyMock)
         after = vitality.value
 
