@@ -7,19 +7,22 @@ from pytest_lazyfixture import lazy_fixture
 from pytest_mock import MockFixture
 
 from src.game.stats import (BoundedStat, CarryingCapacity, ConstValue,
-                            DynamicValue, HasValue, LoadStatus, Modification,
+                            DynamicValue, SupportsGetValue, LoadStatus, Modification,
                             Modifier, Resist, Resource, Skill, Stat)
 # from src.game.stats import ResourceDrained
 
 
-class MockValue(HasValue):
+class MockValue(SupportsGetValue):
 
     def __init__(self, _value: Decimal) -> None:
         self._value = _value
 
+    def get_value(self) -> Decimal:
+        return self._value
+
     @property
     def value(self) -> Decimal:
-        return self._value
+        return self.get_value()
 
     @value.setter
     def value(self, new_value: Decimal) -> None:
@@ -35,15 +38,15 @@ class TestDynamicValue:
     def test_value_changes_if_source_value_changes(self, mock_source: MockValue) -> None:
         dynamic_value = DynamicValue(mock_source)
 
-        before = dynamic_value.value
+        before = dynamic_value.get_value()
         mock_source.value += 1
-        after = dynamic_value.value
+        after = dynamic_value.get_value()
 
         assert before != after
 
     def test_value_stays_decimal_if_float_multiplier_is_given_in_constructor(self, mock_source: MockValue) -> None:
         dynamic_value = DynamicValue(mock_source, 11.11)
-        assert isinstance(dynamic_value.value, Decimal)
+        assert isinstance(dynamic_value.get_value(), Decimal)
 
 
 class TestConstValue:
@@ -82,22 +85,23 @@ class TestModifier:
     @pytest.mark.parametrize('base_arguments_of_value_ten', (lazy_fixture('base_value'), 10, 10.0, '10', '10.0', Decimal('10.0'), DecimalTuple(0, (1, 0, 0), -1)))
     def test_decimal_bases_return_proper_value(self, base_arguments_of_value_ten: Any) -> None:
         assert Modifier(base_arguments_of_value_ten,
-                        Modification.FLAT).value == Decimal(10)
+                        Modification.FLAT).get_value() == Decimal(10)
 
     def test_value_base_returns_proper_value(self, base_value: MockValue) -> None:
-        assert Modifier(base_value, Modification.FLAT).value == Decimal(10)
+        assert Modifier(
+            base_value, Modification.FLAT).get_value() == Decimal(10)
 
-    def test_value_is_read_only(self) -> None:
-        modifier = Modifier(1, Modification.FLAT)
-        with pytest.raises(AttributeError):
-            modifier.value += 1  # type: ignore [misc]
+    # def test_value_is_read_only(self) -> None:
+    #     modifier = Modifier(1, Modification.FLAT)
+    #     with pytest.raises(AttributeError):
+    #         modifier.value += 1  # type: ignore [misc]
 
     def test_value_changes_if_base_value_changes(self, base_value: MockValue) -> None:
         modifier = Modifier(base_value, Modification.FLAT)
 
-        before = modifier.value
+        before = modifier.get_value()
         base_value.value += 1
-        after = modifier.value
+        after = modifier.get_value()
 
         assert before != after
 
@@ -153,25 +157,25 @@ class TestStat:
         assert next(m for m in vitality.modifiers) is buff_flat
 
     def test_adding_flat_modifier_adds_its_value(self, vitality: Stat, buff_flat: Modifier) -> None:
-        expected = vitality.value + buff_flat.value
+        expected = vitality.get_value() + buff_flat.get_value()
         vitality.add_modifier(buff_flat)
-        actual = vitality.value
+        actual = vitality.get_value()
 
         assert expected == actual
 
     def test_adding_percent_multiplicative_modifier_multiplies_by_its_value(self, vitality: Stat, buff_percent_mult: Modifier) -> None:
-        expected = vitality.value * (Decimal(1) + buff_percent_mult.value)
+        expected = vitality.get_value() * (Decimal(1) + buff_percent_mult.get_value())
         vitality.add_modifier(buff_percent_mult)
-        actual = vitality.value
+        actual = vitality.get_value()
 
         assert expected == actual
 
     def test_adding_percent_additive_modifiers_multiplies_by_sum_of_their_values(self, vitality: Stat, buff_percent_add: Modifier) -> None:
-        expected = vitality.value * \
-            (Decimal(1) + buff_percent_add.value + buff_percent_add.value)
+        expected = vitality.get_value() * \
+            (Decimal(1) + buff_percent_add.get_value() + buff_percent_add.get_value())
         vitality.add_modifier(buff_percent_add)
         vitality.add_modifier(buff_percent_add)
-        actual = vitality .value
+        actual = vitality.get_value()
 
         assert expected == actual
 
@@ -179,10 +183,9 @@ class TestStat:
         modifier = Modifier(Decimal(1), Modification.FLAT)
         vitality.add_modifier(modifier)
 
-        before = vitality.value
-        mocker.patch('src.game.stats.Modifier.value',
-                     return_value=5, new_callable=mocker.PropertyMock)
-        after = vitality.value
+        before = vitality.get_value()
+        mocker.patch('src.game.stats.Modifier.get_value', return_value=5)
+        after = vitality.get_value()
 
         assert after - before == Decimal(4)
 
@@ -206,11 +209,11 @@ class TestStat:
         disease = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE,
                            _source="necromancer")
 
-        before = vitality.value
+        before = vitality.get_value()
         vitality.add_modifier(curse)
         vitality.add_modifier(disease)
         vitality.remove_source("necromancer")
-        after = vitality.value
+        after = vitality.get_value()
 
         assert before == after
 
@@ -230,44 +233,44 @@ class TestStat:
         vitality.add_modifier(first)
 
         expected = vitality.base
-        expected += first.value
-        expected *= (1 + second.value)
-        expected += third.value
-        expected *= (1 + fourth.value + fifth.value)
-        expected *= (1 + sixth.value)
+        expected += first.get_value()
+        expected *= (1 + second.get_value())
+        expected += third.get_value()
+        expected *= (1 + fourth.get_value() + fifth.get_value())
+        expected *= (1 + sixth.get_value())
 
-        actual = vitality.value
+        actual = vitality.get_value()
 
         assert expected == actual
 
     def test_temporary_modifiers_do_not_persist(self, vitality: Stat, modifiers: list[Modifier]) -> None:
-        _ = vitality.calculate_value_with_temporary_modifiers(modifiers)
+        _ = vitality.get_value(modifiers)
         assert not vitality.modifiers
 
     def test_temporary_modifiers_do_not_change_value(self, vitality: Stat, modifiers: list[Modifier]) -> None:
-        before = vitality.value
-        _ = vitality.calculate_value_with_temporary_modifiers(modifiers)
-        after = vitality.value
+        before = vitality.get_value()
+        _ = vitality.get_value(modifiers)
+        after = vitality.get_value()
 
         assert before == after
 
     def test_temporary_flat_modifier_adds_its_value(self, vitality: Stat, buff_flat: Modifier) -> None:
-        expected = vitality.value + buff_flat.value
-        actual = vitality.calculate_value_with_temporary_modifiers([buff_flat])
+        expected = vitality.get_value() + buff_flat.get_value()
+        actual = vitality.get_value([buff_flat])
 
         assert expected == actual
 
     def test_temporary_percent_multiplicative_modifier_multiplies_by_its_value(self, vitality: Stat, buff_percent_mult: Modifier) -> None:
-        expected = vitality.value * (Decimal(1) + buff_percent_mult.value)
-        actual = vitality.calculate_value_with_temporary_modifiers(
+        expected = vitality.get_value() * (Decimal(1) + buff_percent_mult.get_value())
+        actual = vitality.get_value(
             [buff_percent_mult])
 
         assert expected == actual
 
     def test_temporary_percent_additive_modifiers_multiply_by_sum_of_their_values(self, vitality: Stat, buff_percent_add: Modifier) -> None:
-        expected = vitality.value * \
-            (Decimal(1) + buff_percent_add.value + buff_percent_add.value)
-        actual = vitality.calculate_value_with_temporary_modifiers(
+        expected = vitality.get_value() * \
+            (Decimal(1) + buff_percent_add.get_value() + buff_percent_add.get_value())
+        actual = vitality.get_value(
             [buff_percent_add, buff_percent_add])
 
         assert expected == actual
@@ -281,13 +284,13 @@ class TestStat:
         sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, _order=5)
 
         expected = vitality.base
-        expected += first.value
-        expected *= (1 + second.value)
-        expected += third.value
-        expected *= (1 + fourth.value + fifth.value)
-        expected *= (1 + sixth.value)
+        expected += first.get_value()
+        expected *= (1 + second.get_value())
+        expected += third.get_value()
+        expected *= (1 + fourth.get_value() + fifth.get_value())
+        expected *= (1 + sixth.get_value())
 
-        actual = vitality.calculate_value_with_temporary_modifiers(
+        actual = vitality.get_value(
             [sixth, fourth, fifth, second, third, first])
 
         assert expected == actual
@@ -305,30 +308,30 @@ class TestStat:
         vitality.add_modifier(fourth)
 
         expected = vitality.base
-        expected += first.value
-        expected *= (1 + second.value)
-        expected += third.value
-        expected *= (1 + fourth.value + fifth.value)
-        expected *= (1 + sixth.value)
+        expected += first.get_value()
+        expected *= (1 + second.get_value())
+        expected += third.get_value()
+        expected *= (1 + fourth.get_value() + fifth.get_value())
+        expected *= (1 + sixth.get_value())
 
-        actual = vitality.calculate_value_with_temporary_modifiers(
+        actual = vitality.get_value(
             [fifth, second, third])
 
         assert expected == actual
 
     def test_temporary_modifiers_do_not_remove_effects_of_persistent_modifiers(self, vitality: Stat) -> None:
         vitality.add_modifier(Modifier(Decimal(1), Modification.FLAT))
-        before = vitality.value
-        _ = vitality.calculate_value_with_temporary_modifiers(
+        before = vitality.get_value()
+        _ = vitality.get_value(
             [Modifier(Decimal('0.5'), Modification.PERCENT_MULTIPLICATIVE)])
-        after = vitality.value
+        after = vitality.get_value()
 
         assert before == after
 
     def test_temporary_modifiers_do_not_remove_persistent_modifiers(self, vitality: Stat) -> None:
         persistent = Modifier(Decimal(1), Modification.FLAT)
         vitality.add_modifier(persistent)
-        _ = vitality.calculate_value_with_temporary_modifiers(
+        _ = vitality.get_value(
             [Modifier(Decimal('0.5'), Modification.PERCENT_MULTIPLICATIVE)])
 
         assert persistent in vitality.modifiers
@@ -354,7 +357,7 @@ class TestBoundedStat:
         vitality = BoundedStat(1, 0, 100, 125)
         vitality.add_modifier(Modifier(modifier_value, Modification.FLAT))
 
-        assert 0 <= vitality.value <= 125
+        assert 0 <= vitality.get_value() <= 125
 
     @pytest.mark.parametrize('new_base', (-200, 200))
     def test_cannot_push_base_out_of_bounds(self, new_base: int) -> None:
@@ -379,7 +382,7 @@ class TestBoundedStat:
     @pytest.mark.parametrize('modifier_value', (Decimal(-200), Decimal(200)))
     def test_temporary_modifiers_cannot_push_value_out_of_bounds(self, modifier_value: Decimal) -> None:
         vitality = BoundedStat(1, 0, 100, 125)
-        temporary_value = vitality.calculate_value_with_temporary_modifiers(
+        temporary_value = vitality.get_value(
             [Modifier(modifier_value, Modification.FLAT)])
 
         assert 0 <= temporary_value <= 125
@@ -454,7 +457,7 @@ class TestResource:
         return Resource(10)
 
     def test_current_equals_total_after_construction(self, hp: Resource) -> None:
-        assert hp.current == hp.value
+        assert hp.current == hp.get_value()
 
     @pytest.mark.parametrize('increment', (5, -5))
     def test_current_can_be_changed(self, hp: Resource, increment: int) -> None:
@@ -468,7 +471,7 @@ class TestResource:
     def test_current_cannot_be_increased_above_total(self, hp: Resource) -> None:
         hp.current += 20
 
-        assert hp.current == hp.value
+        assert hp.current == hp.get_value()
 
     def test_current_can_be_increased_when_total_is_increased(self, hp: Resource) -> None:
         expected = hp.current + 10

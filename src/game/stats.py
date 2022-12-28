@@ -10,30 +10,29 @@ from typing import (Any, ClassVar, ItemsView, Iterator, Literal, Mapping, Mutabl
 from typing_extensions import override
 
 from lib.assert_never import assert_never
-from lib.decimal_tools import DecimalRange, SupportsDecimal
+from lib.decimal_tools import DecimalRange, SupportsDecimal, roll_decimal
 from lib.sentinel import Sentinel
 from src.game.xp import ExponentialLevelSystem
 
 
 @runtime_checkable
-class HasValue(Protocol):
-    @abstractproperty
-    def value(self) -> Decimal: ...
+class SupportsGetValue(Protocol):
+    @abstractmethod
+    def get_value(self) -> Decimal: ...
 
 
-class DynamicValue(HasValue):
+class DynamicValue(SupportsGetValue):
 
-    def __init__(self, _dynamic_source: HasValue,
+    def __init__(self, _dynamic_source: SupportsGetValue,
                  _multiplier: SupportsDecimal = Decimal('1.0')) -> None:
         self._dynamic_source = _dynamic_source
         self._multiplier = Decimal(_multiplier)
 
-    @ property
-    def value(self) -> Decimal:
-        return self._dynamic_source.value * self._multiplier
+    def get_value(self) -> Decimal:
+        return self._dynamic_source.get_value() * self._multiplier
 
 
-class ConstValue(HasValue):
+class ConstValue(SupportsGetValue):
 
     __stored: ClassVar[dict[Decimal, ConstValue]] = {}
 
@@ -52,8 +51,7 @@ class ConstValue(HasValue):
 
             return instance
 
-    @ property
-    def value(self) -> Decimal:
+    def get_value(self) -> Decimal:
         return self._value
 
 
@@ -68,7 +66,7 @@ Order: TypeAlias = Literal[0, 1, 2, 3, 4, 5]
 ORDER_VALUES: tuple[Order, ...] = get_args(Order)
 
 
-class Modifier(HasValue):
+class Modifier(SupportsGetValue):
 
     """
     Modifiers are used to modify values of stats. The order in which modifiers should
@@ -121,7 +119,7 @@ class Modifier(HasValue):
     ```
         """
 
-    def __init__(self, _base: HasValue | SupportsDecimal, _modification: Modification,
+    def __init__(self, _base: SupportsGetValue | SupportsDecimal, _modification: Modification,
                  _order: Order | None = None,
                  _source: object | None = None) -> None:
         """
@@ -153,7 +151,7 @@ class Modifier(HasValue):
             """
 
         self._base = _base if isinstance(
-            _base, HasValue) else ConstValue(Decimal(_base))
+            _base, SupportsGetValue) else ConstValue(Decimal(_base))
 
         self._modification = _modification
 
@@ -176,12 +174,11 @@ class Modifier(HasValue):
     def modification(self) -> Modification:
         return self._modification
 
-    @property
-    def value(self) -> Decimal:
-        return self._base.value
+    def get_value(self) -> Decimal:
+        return self._base.get_value()
 
 
-class Stat(HasValue, ABC):
+class Stat(SupportsGetValue, ABC):
 
     def __init__(self, _base: SupportsDecimal) -> None:
         self._base = Decimal(_base)
@@ -199,16 +196,21 @@ class Stat(HasValue, ABC):
     def modifiers(self) -> tuple[Modifier, ...]:
         return tuple(self._modifiers)
 
-    @property
-    def value(self) -> Decimal:
-        value = self._calculate_modified_value(self._modifiers)
-        return self._adjusted_value(value)
+    def get_value(self, optional_modifiers: list[Modifier] | None = None) -> Decimal:
+        if optional_modifiers:
+            modifiers = self._modifiers + optional_modifiers
+            modifiers.sort(key=lambda m: m.order)
+        else:
+            modifiers = self._modifiers
 
-    def calculate_value_with_temporary_modifiers(self, temporary_modifiers: list[Modifier]) -> Decimal:
-        modifiers = self._modifiers + temporary_modifiers
-        modifiers.sort(key=lambda m: m.order)
         value = self._calculate_modified_value(modifiers)
         return self._adjusted_value(value)
+
+    # def calculate_value_with_temporary_modifiers(self, temporary_modifiers: list[Modifier]) -> Decimal:
+    #     modifiers = self._modifiers + temporary_modifiers
+    #     modifiers.sort(key=lambda m: m.order)
+    #     value = self._calculate_modified_value(modifiers)
+    #     return self._adjusted_value(value)
 
     def add_modifier(self, modifier: Modifier) -> None:
         self._modifiers.append(modifier)
@@ -235,10 +237,10 @@ class Stat(HasValue, ABC):
 
         for i, modifier in enumerate(modifiers):
             if modifier.modification is Modification.FLAT:
-                value += modifier.value
+                value += modifier.get_value()
 
             elif modifier.modification is Modification.PERCENT_ADDITIVE:
-                sum_percent_additive += modifier.value
+                sum_percent_additive += modifier.get_value()
 
                 # Keep increasing the sum while there are percent additive modifiers.
                 with suppress(IndexError):
@@ -249,7 +251,7 @@ class Stat(HasValue, ABC):
                 sum_percent_additive = Decimal(0)
 
             elif modifier.modification is Modification.PERCENT_MULTIPLICATIVE:
-                value *= Decimal(1) + modifier.value
+                value *= Decimal(1) + modifier.get_value()
 
             else:
                 assert_never(modifier.modification)
@@ -393,7 +395,7 @@ class CarryingCapacity(BoundedStat):
         self._load = Decimal(0)
 
     def __str__(self) -> str:
-        return f"{self.load}/{self.value} lb"
+        return f"{self.load}/{self.get_value()} lb"
 
     @property
     def load(self) -> Decimal:
@@ -405,10 +407,10 @@ class CarryingCapacity(BoundedStat):
 
     @property
     def load_status(self) -> LoadStatus:
-        if self.value == Decimal(0):
+        if self.get_value() == Decimal(0):
             return LoadStatus.RED if self.load > Decimal(0) else LoadStatus.WHITE
 
-        load_percent = self.load / self.value
+        load_percent = self.load / self.get_value()
 
         assert self.load >= Decimal(0)
         # Ensure the dictionary is sorted from max to min.
@@ -449,7 +451,7 @@ class Resource(SecondaryStat):
         #     0) else True
 
     def __str__(self) -> str:
-        return f"{self.current}/{self.value}"
+        return f"{self.current}/{self.get_value()}"
 
     @property
     def current(self) -> Decimal:
@@ -493,7 +495,7 @@ class Resource(SecondaryStat):
 
     def regenerate(self) -> Decimal:
         before = self.current
-        self.current += self.regeneration.value
+        self.current += self.regeneration.get_value()
         after = self.current
 
         assert after - before >= 0
@@ -517,7 +519,7 @@ class Resource(SecondaryStat):
 
     def _update_current(self) -> None:
         self._current = self._adjust_for_bounds(
-            self._current, self._lower_bound, self.value)
+            self._current, self._lower_bound, self.get_value())
 
         # if self._lower_bound is not None \
         #         and self._current <= self._lower_bound \
@@ -581,6 +583,36 @@ class Skill(PrimaryStat, ExponentialLevelSystem):
     def _set_base(self, new_value: SupportsDecimal) -> None:
         super()._set_base(new_value)
         self._refresh_xp()
+
+
+class DamageBonus(BoundedStat):
+
+    def __init__(self, _base: SupportsDecimal) -> None:
+        super().__init__(_base, _lower_bound=Decimal(0),
+                         _upper_bound=None, _modified_upper_bound=None)
+
+
+class Damage(BoundedStat):
+
+    def __init__(self, _base: SupportsDecimal, _bonus: SupportsDecimal | None = None) -> None:
+        super().__init__(_base, _lower_bound=Decimal(0),
+                         _upper_bound=None, _modified_upper_bound=None)
+        self._bonus = DamageBonus(
+            _bonus) if _bonus is not None else DamageBonus(Decimal(0))
+
+    @property
+    def bonus(self) -> DamageBonus:
+        return self._bonus
+
+    def roll(self, optional_modifiers: list[Modifier] | None) -> Decimal:
+        damage_min = self.get_value(optional_modifiers)
+        damage_max = damage_min + self.bonus.get_value(optional_modifiers)
+        return roll_decimal(damage_min, damage_max)
+
+    @override
+    def remove_source(self, source: object) -> None:
+        super().remove_source(source)
+        self.bonus.remove_source(source)
 
 
 class PrimaryStatType(Enum):
@@ -748,6 +780,10 @@ class DefenceBlock(StatBlock[DamageSource, Defence]):
 
 
 class ResistBlock(StatBlock[DamageSource, Resist]):
+    pass
+
+
+class DamageBlock(StatBlock[DamageSource, Damage]):
     pass
 
 

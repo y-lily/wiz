@@ -5,7 +5,7 @@ from typing import TypeAlias
 SupportsDecimal: TypeAlias = Decimal | str | int | float | DecimalTuple
 
 
-def _random_decimal(minimum: Decimal, maximum: Decimal, digits: int = 2) -> Decimal:
+def roll_decimal(minimum: Decimal, maximum: Decimal, digits: int = 2) -> Decimal:
     assert digits >= 0
 
     comma_shift: int = 10 ** digits
@@ -41,7 +41,7 @@ class DecimalRange:
         self._adjust_order()
 
     def get_random_value(self) -> Decimal:
-        return _random_decimal(self.lower, self.upper)
+        return roll_decimal(self.lower, self.upper)
 
     def _adjust_order(self) -> None:
         if self._lower > self._upper:
