@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod, abstractproperty
 from contextlib import suppress
 from decimal import Decimal
 from enum import Enum
-from typing import (Any, ClassVar, ItemsView, Iterator, Literal, Mapping, Protocol,
-                    TypeAlias, TypeVar, TypedDict, get_args, overload, runtime_checkable)
+from typing import (Any, ClassVar, ItemsView, Iterator, Literal, Mapping, MutableMapping, Protocol, Type,
+                    TypeAlias, TypeVar, TypedDict, Union, cast, get_args, overload, runtime_checkable)
 
 from typing_extensions import override
 
@@ -686,34 +686,37 @@ class ResourceType(Enum):
     MANA_POINTS = "MP"
 
 
-STT = TypeVar("STT", PrimaryStatType, SkillType,
-              SecondaryStatType, ResourceType, DamageSource)
-ST = TypeVar("ST", bound=Stat)
+# ST = TypeVar("ST", PrimaryStatType, SkillType,
+#              SecondaryStatType, ResourceType, DamageSource)
+ST = TypeVar("ST")
+S = TypeVar("S", bound=Stat)
 
 
-class StatBlock(Mapping[STT, ST]):
+class StatBlock(Mapping[ST, S]):
 
-    def __init__(self, _stats: dict[STT, ST]) -> None:
-        self._stats: dict[STT, ST] = _stats
+    def __init__(self, _stats: dict[ST, S]) -> None:
+        self._stats: dict[ST, S] = _stats
 
-    def __getitem__(self, __key: STT) -> ST:
+    def __getitem__(self, __key: ST) -> S:
         return self._stats[__key]
 
-    def __iter__(self) -> Iterator[STT]:
+    def __iter__(self) -> Iterator[ST]:
         return self._stats.__iter__()
 
     def __len__(self) -> int:
         return len(self._stats)
 
-    def items(self) -> ItemsView[STT, ST]:
-        return self._stats.items()
+    def __new__(cls, *args: Any, **kwargs: Any) -> StatBlock[ST, S]:
+        if cls is StatBlock:
+            raise TypeError("Direct instantion of StatBlock is forbidden.")
+
+        instance = object.__new__(cls)
+        cls.__init__(instance, *args, **kwargs)
+        return instance
 
     def remove_source(self, source: object) -> None:
         for stat_ in self._stats.values():
             stat_.remove_source(source)
-
-    def setdefault(self, key: STT, value: ST) -> ST:
-        return self._stats.setdefault(key, value)
 
 
 class PrimaryStatBlock(StatBlock[PrimaryStatType, PrimaryStat]):
@@ -748,102 +751,50 @@ class ResistBlock(StatBlock[DamageSource, Resist]):
     pass
 
 
-class StatBlockType(Enum):
-
-    PRIMARY_STATS = "primary_stats"
-    SKILLS = "skills"
-    SECONDARY_STATS = "secondary_stats"
-    RESOURCES = "resources"
-    ARMOUR = "armour"
-    DAMAGE_REDUCTION = "damage_reduction"
-    DEFENCE = "defence"
-    RESIST = "resist"
+SB = TypeVar("SB", bound=StatBlock[Any, Any])
 
 
-class StatSheet(Mapping[StatBlockType, StatBlock[Any, Any]]):
+class StatSheet:
 
-    def __init__(self,
-                 _primary_stats: PrimaryStatBlock,
-                 _skills: SkillBlock,
-                 _secondary_stats: SecondaryStatBlock,
-                 _resources: ResourceBlock,
-                 _armour: ArmourBlock,
-                 _damage_reduction: DamageReductionBlock,
-                 _defence: DefenceBlock,
-                 _resist: ResistBlock, **kwargs: object) -> None:
+    def __init__(self, *blocks: StatBlock[Any, Any]) -> None:
+        self._stats = {type(block): block for block in blocks}
 
-        self._stats: dict[StatBlockType, StatBlock[Any, Any]] = {StatBlockType.PRIMARY_STATS: _primary_stats,
-                                                                 StatBlockType.SKILLS: _skills,
-                                                                 StatBlockType.SECONDARY_STATS: _secondary_stats,
-                                                                 StatBlockType.RESOURCES: _resources,
-                                                                 StatBlockType.ARMOUR: _armour,
-                                                                 StatBlockType.DAMAGE_REDUCTION: _damage_reduction,
-                                                                 StatBlockType.DEFENCE: _defence,
-                                                                 StatBlockType.RESIST: _resist}
+    def __iter__(self) -> Iterator[StatBlock[Any, Any]]:
+        return self._stats.values().__iter__()
 
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.PRIMARY_STATS]) -> PrimaryStatBlock: ...
+    def add(self, block: SB) -> None:
+        self._stats[type(block)] = block
 
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.SKILLS]) -> SkillBlock: ...
+    def get(self, key: Type[SB]) -> SB:
+        # The keys are always supposed to be the types of values.
+        return cast(SB, self._stats[key])
 
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.SECONDARY_STATS]) -> SecondaryStatBlock: ...
-
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.RESOURCES]) -> ResourceBlock: ...
-
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.ARMOUR]) -> ArmourBlock: ...
-
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.DAMAGE_REDUCTION]) -> DamageReductionBlock: ...
-
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.DEFENCE]) -> DefenceBlock: ...
-
-    @overload
-    def __getitem__(
-        self, sbt: Literal[StatBlockType.RESIST]) -> ResistBlock: ...
-
-    def __getitem__(self, sbt: StatBlockType) -> StatBlock[Any, Any]:
-        return self._stats[sbt]
-
-    def __iter__(self) -> Iterator[StatBlockType]:
-        return self._stats.__iter__()
-
-    def __len__(self) -> int:
-        return self._stats.__len__()
+    def remove_source(self, source: object) -> None:
+        for block in self._stats.values():
+            block.remove_source(source)
 
 
-class StatDraft(TypedDict):
+# class StatDraft(TypedDict):
 
-    _base: SupportsDecimal
-    _base_max: SupportsDecimal | None
-    _lower_bound: SupportsDecimal | None
-    _upper_bound: SupportsDecimal | None
-    _modified_upper_bound: SupportsDecimal | None
-    _scale: SupportsDecimal
-    _regeneration: SupportsDecimal | ResourceRegeneration
-    _growth: SupportsDecimal
-    _growth_max: SupportsDecimal
+#     _base: SupportsDecimal
+#     _base_max: SupportsDecimal | None
+#     _lower_bound: SupportsDecimal | None
+#     _upper_bound: SupportsDecimal | None
+#     _modified_upper_bound: SupportsDecimal | None
+#     _scale: SupportsDecimal
+#     _regeneration: SupportsDecimal | ResourceRegeneration
+#     _growth: SupportsDecimal
+#     _growth_max: SupportsDecimal
 
 
-class StatSheetDraft(TypedDict):
+# class StatSheetDraft(TypedDict):
 
-    _primary_stats: dict[str, StatDraft]
-    _skills: dict[str, StatDraft]
-    _secondary_stats: dict[str, StatDraft]
-    _resources: dict[str, StatDraft]
+#     _primary_stats: dict[str, StatDraft]
+#     _skills: dict[str, StatDraft]
+#     _secondary_stats: dict[str, StatDraft]
+#     _resources: dict[str, StatDraft]
 
-    _armour: dict[str, StatDraft]
-    _damage_reduction: dict[str, StatDraft]
-    _defence: dict[str, StatDraft]
-    _resist: dict[str, StatDraft]
+#     _armour: dict[str, StatDraft]
+#     _damage_reduction: dict[str, StatDraft]
+#     _defence: dict[str, StatDraft]
+#     _resist: dict[str, StatDraft]
