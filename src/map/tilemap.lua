@@ -3,16 +3,12 @@ local Object = require "classic"
 ---@class Tilemap : Object
 local Tilemap = Object:extend()
 
----@param image love.Image      tileset
----@param tw number             tile width (pixels)
----@param th number             tile height (pixels)
----@param map table             map with the tile indices
----@param mw? integer           width of the map (columns)
-function Tilemap:new(image, tw, th, map, mw)
-    self.image = image
-    self.tileWidth = tw
-    self.tileHeight = th
-    self.map = map
+function Tilemap:new(map_data)
+    self.image = love.graphics.newImage(map_data.tilesets[1].name .. ".png")
+    self.tileWidth = map_data.tilewidth
+    self.tileHeight = map_data.tileheight
+    self.map = map_data.layers[1].data
+    self.uvs = {}
     self.quads = {}
     self.drawable = {
         x = 1,
@@ -22,8 +18,9 @@ function Tilemap:new(image, tw, th, map, mw)
     }
     self.wx = 0
     self.wy = 0
+    self:_updateUVs()
     self:_setupQuads()
-    self:_splitMap(mw)
+    self:_splitMap(map_data.layers[1].width)
 end
 
 ---Update drawable info.
@@ -41,25 +38,50 @@ end
 ---@param wx? number
 ---@param wy? number
 function Tilemap:draw(wx, wy)
-    self.wx = wx or self.wx
-    self.wy = wy or self.wy
+    if (wx ~= nil and wx ~= self.wx) or (wy ~= nil and wy ~= self.wy) then
+        self.wx = wx or self.wx
+        self.wy = wy or self.wy
+        self:_updateUVs()
+    end
+
+    local window_width, window_height = love.graphics.getDimensions()
+
     for j = 0, self.drawable.height - 1 do
-        local height = (j) * self.tileHeight + wy
-        if height > love.graphics.getHeight() then return end -- Don't draw rows off screen.
+        local vs = self.uvs[j + 1]
+        local v = vs[1].v
+        if v > window_height then return end -- Don't draw off screen.
         local row = self.map[self.drawable.y + j]
         if row == nil then goto continue end -- Skip non-present rows but don't abort in case we deal with negative indices.
 
         for i = 0, self.drawable.width - 1 do
-            local width = (i) * self.tileWidth + wx
-            if width > love.graphics.getWidth() then break end -- Don't draw columns off screen.
+            local u = vs[i + 1].u
+            if u > window_width then break end -- Don't draw columns off screen.
             local tile = row[self.drawable.x + i]
             local quad = self.quads[tile]
             if quad ~= nil then
-                love.graphics.draw(self.image, quad, width, height)
+                love.graphics.draw(self.image, quad, u, v)
             end
         end
 
         ::continue::
+    end
+end
+
+function Tilemap:_updateUVs()
+    self.uvs = {}
+
+    local max_width, max_height = love.window.getDesktopDimensions()
+
+    for j = 0 + self.wy, max_height, self.tileHeight do
+        local row = {}
+        for i = 0 + self.wx, max_width, self.tileWidth do
+            local uv = {
+                u = i,
+                v = j
+            }
+            table.insert(row, uv)
+        end
+        table.insert(self.uvs, row)
     end
 end
 
@@ -79,13 +101,12 @@ function Tilemap:_setupQuads()
 end
 
 function Tilemap:_splitMap(map_width)
-    if type(self.map[1]) == "table" or map_width < 1 then
+    if type(self.map[1]) == "table" or map_width == nil or map_width < 1 then
         return
     end
 
     local new_map = {}
     for i = 1, #self.map, map_width do
-        -- local row = { table.unpack(self.map, i, i + map_width - 1) }
         local row = { unpack(self.map, i, i + map_width - 1) }
         table.insert(new_map, row)
     end
