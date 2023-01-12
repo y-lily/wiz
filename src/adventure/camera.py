@@ -35,10 +35,10 @@ class Camera:
     def zoom(self, new_value: float) -> None:
         self._map_layer.zoom = new_value
 
-    # @property
-    # def sprites(self) -> list[pygame.sprite.Sprite]:
-    #     sprites: list[pygame.sprite.Sprite] = self._group.sprites()
-    #     return sprites
+    @property
+    def sprites(self) -> list[pygame.sprite.Sprite]:
+        sprites: list[pygame.sprite.Sprite] = self._group.sprites()
+        return sprites
 
     def add_sprites(self, *sprites: Sprite, layer: int | None = None) -> None:
         self._group.add(sprites, layer=layer)
@@ -71,7 +71,7 @@ class AdventureCamera(Camera):
     def __init__(self, _screen: pygame.surface.Surface, _tmx_path: str | pathlib.Path) -> None:
         super().__init__(_screen, _tmx_path)
 
-        self._default_layer = self.get_layer_index("floor")
+        self._default_layer = self.get_layer_index("sprites")
         self._collisions = self._load_collisions()
 
         self._roof_sprites = self._load_roof_sprites()
