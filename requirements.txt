@@ -12,9 +12,11 @@ pygame==2.1.2
 PyQt6==6.4.0
 PyQt6-Qt6==6.4.1
 PyQt6-sip==13.4.0
+pyscroll==2.30
 pytest==7.2.0
 pytest-lazy-fixture==0.6.3
 pytest-mock==3.10.0
+python-statemachine==1.0.2
 PyTMX==3.31
 tomli==2.0.1
 typing_extensions==4.4.0
