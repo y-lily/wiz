@@ -46,6 +46,7 @@ class Animation:
                       res_dir: Path,
                       atlas: Optional[SpriteSheet] = None,
                       ) -> Animation:
+
         res_dir = pathlib.Path(res_dir)
         alpha = _get_boolean(data.attrib, "alpha", default=False)
         atlas = atlas if atlas is not None else SpriteSheet(

@@ -205,9 +205,9 @@ class TestStat:
         assert before == after
 
     def test_removing_source_removes_all_modifiers_from_it(self, vitality: Stat) -> None:
-        curse = Modifier(-1, Modification.FLAT, _source="necromancer")
+        curse = Modifier(-1, Modification.FLAT, source="necromancer")
         disease = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE,
-                           _source="necromancer")
+                           source="necromancer")
 
         before = vitality.get_value()
         vitality.add_modifier(curse)
@@ -218,12 +218,12 @@ class TestStat:
         assert before == after
 
     def test_modifiers_are_applied_in_order(self, vitality: Stat) -> None:
-        first = Modifier(1, Modification.FLAT, _order=1)
-        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, _order=2)
-        third = Modifier(3, Modification.FLAT, _order=3)
-        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, _order=4)
-        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, _order=4)
-        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, _order=5)
+        first = Modifier(1, Modification.FLAT, order=1)
+        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, order=2)
+        third = Modifier(3, Modification.FLAT, order=3)
+        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, order=4)
+        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, order=4)
+        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, order=5)
 
         vitality.add_modifier(sixth)
         vitality.add_modifier(fourth)
@@ -276,12 +276,12 @@ class TestStat:
         assert expected == actual
 
     def test_temporary_modifiers_are_applied_in_order(self, vitality: Stat) -> None:
-        first = Modifier(1, Modification.FLAT, _order=1)
-        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, _order=2)
-        third = Modifier(3, Modification.FLAT, _order=3)
-        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, _order=4)
-        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, _order=4)
-        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, _order=5)
+        first = Modifier(1, Modification.FLAT, order=1)
+        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, order=2)
+        third = Modifier(3, Modification.FLAT, order=3)
+        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, order=4)
+        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, order=4)
+        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, order=5)
 
         expected = vitality.base
         expected += first.get_value()
@@ -296,12 +296,12 @@ class TestStat:
         assert expected == actual
 
     def test_temporary_modifiers_are_applied_in_order_with_persistent_modifiers(self, vitality: Stat) -> None:
-        first = Modifier(1, Modification.FLAT, _order=1)
-        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, _order=2)
-        third = Modifier(3, Modification.FLAT, _order=3)
-        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, _order=4)
-        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, _order=4)
-        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, _order=5)
+        first = Modifier(1, Modification.FLAT, order=1)
+        second = Modifier(0.3, Modification.PERCENT_MULTIPLICATIVE, order=2)
+        third = Modifier(3, Modification.FLAT, order=3)
+        fourth = Modifier(0.2, Modification.PERCENT_ADDITIVE, order=4)
+        fifth = Modifier(0.1, Modification.PERCENT_ADDITIVE, order=4)
+        sixth = Modifier(-0.5, Modification.PERCENT_MULTIPLICATIVE, order=5)
 
         vitality.add_modifier(sixth)
         vitality.add_modifier(first)
@@ -391,11 +391,11 @@ class TestBoundedStat:
 class TestResist:
 
     def test_base_becomes_passed_base_if_base_max_is_not_passed(self) -> None:
-        physical = Resist(_base=1)
+        physical = Resist(base=1)
         assert physical.base == 1
 
     def test_base_increases_on_grow(self) -> None:
-        physical = Resist(_base=1, _growth=1, _growth_max=1)
+        physical = Resist(base=1, growth=1, growth_max=1)
         expected = physical.base + physical.grow()
         actual = physical.base
 
@@ -413,14 +413,14 @@ class TestResist:
 
     def test_passing_negative_growth_raises_value_error(self) -> None:
         with pytest.raises(ValueError):
-            _ = Resist(_base=1, _growth=Decimal('-0.01'))
+            _ = Resist(base=1, growth=Decimal('-0.01'))
 
     def test_passing_negative_growth_max_raises_value_error(self) -> None:
         with pytest.raises(ValueError):
-            _ = Resist(_base=1, _growth_max=Decimal('-0.01'))
+            _ = Resist(base=1, growth_max=Decimal('-0.01'))
 
     def test_passing_growths_equal_to_zero_does_not_raise_errors(self) -> None:
-        _ = Resist(_base=1, _growth=Decimal(0), _growth_max=Decimal(0))
+        _ = Resist(base=1, growth=Decimal(0), growth_max=Decimal(0))
 
 
 class TestCarryingCapacity:
@@ -490,7 +490,7 @@ class TestResource:
         assert expected == actual
 
     def test_current_cannot_be_decreased_below_lower_bound(self) -> None:
-        sp = Resource(_base=10, _lower_bound=0)
+        sp = Resource(base=10, lower_bound=0)
 
         # with suppress(ResourceDrained):
         #     sp.current -= 20
@@ -627,7 +627,7 @@ class TestSkill:
 
     @pytest.fixture
     def stealth(self) -> Skill:
-        return Skill(_base=0, _scale=Decimal('1.4'))
+        return Skill(base=0, scale=Decimal('1.4'))
 
     @pytest.fixture
     def xp_at_level_one(self) -> int:

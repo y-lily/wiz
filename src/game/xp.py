@@ -6,8 +6,8 @@ from lib.decimal_tools import SupportsDecimal
 
 class ExponentialLevelSystem(ABC):
 
-    def __init__(self, _scale: SupportsDecimal) -> None:
-        self._scale = Decimal(_scale)
+    def __init__(self, scale: SupportsDecimal) -> None:
+        self._scale = Decimal(scale)
         self._xp_points = 0
         self._refresh_xp()
 

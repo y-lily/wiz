@@ -32,18 +32,19 @@ class Status:
     # is removed, the status is considered expired.
 
     def __init__(self,
-                 _description: str,
-                 _marks: list[SourceMark] | None = None,
-                 _duration: int | None = None) -> None:
+                 description: str,
+                 marks: list[SourceMark] | None = None,
+                 duration: int | None = None,
+                 ) -> None:
 
-        if not _marks and not _duration:
+        if not marks and not duration:
             raise ValueError(
                 "The status lacks both marks and duration and thus cannot expire."
                 "Pass the SourceMark.PERMANENT explicitly if you want to create a permanent status.")
 
-        self._marks = _marks if _marks else [SourceMark.TIME]
-        self._description = _description
-        self._duration = _duration
+        self._marks = marks if marks else [SourceMark.TIME]
+        self._description = description
+        self._duration = duration
         self._token: Final = StatusToken("self._description")
         self._expired = False
 
@@ -106,30 +107,32 @@ PRIORITY_VALUES: tuple[Priority, ...] = get_args(Priority)
 
 class UniqueStatus(Status):
 
-    def __init__(self, _description: str,
-                 _unique_mark: SourceMark,
-                 _override_behaviour: OverrideBehaviour,
-                 _marks: list[SourceMark] | None = None,
-                 _duration: int | None = None,
-                 _priority: Priority | None = None,
-                 _overridable: bool = True) -> None:
+    def __init__(self,
+                 description: str,
+                 unique_mark: SourceMark,
+                 override_behaviour: OverrideBehaviour,
+                 marks: list[SourceMark] | None = None,
+                 duration: int | None = None,
+                 priority: Priority | None = None,
+                 overridable: bool = True,
+                 ) -> None:
 
-        if _marks is None:
-            _marks = [_unique_mark]
-        elif not _unique_mark in _marks:
-            _marks.append(_unique_mark)
+        if marks is None:
+            marks = [unique_mark]
+        elif not unique_mark in marks:
+            marks.append(unique_mark)
 
-        super().__init__(_description, _marks, _duration)
+        super().__init__(description, marks, duration)
 
-        self._unique_mark = _unique_mark
-        self._override_behaviour = _override_behaviour
+        self._unique_mark = unique_mark
+        self._override_behaviour = override_behaviour
 
         assert self._override_behaviour.value in PRIORITY_VALUES, (
             "Inappropriate override behaviour value, expected to be in"
             f"{str(PRIORITY_VALUES)}, but became {self._override_behaviour.value}.")
-        self._priority: Priority = _priority if _priority is not None else self._override_behaviour.value
+        self._priority: Priority = priority if priority is not None else self._override_behaviour.value
 
-        self._overridable = _overridable
+        self._overridable = overridable
 
     @property
     def overridable(self) -> bool:

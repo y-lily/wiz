@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from contextlib import suppress
 from decimal import Decimal
 from enum import Enum
-from typing import (Any, ClassVar, ItemsView, Iterator, Literal, Mapping, MutableMapping, Protocol, Type,
-                    TypeAlias, TypeVar, TypedDict, Union, cast, get_args, overload, runtime_checkable)
+from typing import (Any, ClassVar, Iterable, Iterator, Literal, Mapping, Protocol, Type,
+                    TypeAlias, TypeVar, cast, get_args, runtime_checkable)
 
 from typing_extensions import override
 
@@ -23,10 +23,13 @@ class SupportsGetValue(Protocol):
 
 class DynamicValue(SupportsGetValue):
 
-    def __init__(self, _dynamic_source: SupportsGetValue,
-                 _multiplier: SupportsDecimal = Decimal('1.0')) -> None:
-        self._dynamic_source = _dynamic_source
-        self._multiplier = Decimal(_multiplier)
+    def __init__(self,
+                 dynamic_source: SupportsGetValue,
+                 multiplier: SupportsDecimal = Decimal('1.0'),
+                 ) -> None:
+
+        self._dynamic_source = dynamic_source
+        self._multiplier = Decimal(multiplier)
 
     def get_value(self) -> Decimal:
         return self._dynamic_source.get_value() * self._multiplier
@@ -36,8 +39,8 @@ class ConstValue(SupportsGetValue):
 
     __stored: ClassVar[dict[Decimal, ConstValue]] = {}
 
-    def __init__(self, _value: SupportsDecimal) -> None:
-        self._value = Decimal(_value)
+    def __init__(self, value: SupportsDecimal) -> None:
+        self._value = Decimal(value)
 
     def __new__(cls, _value: SupportsDecimal) -> ConstValue:
         _value = Decimal(_value)
@@ -119,9 +122,12 @@ class Modifier(SupportsGetValue):
     ```
         """
 
-    def __init__(self, _base: SupportsGetValue | SupportsDecimal, _modification: Modification,
-                 _order: Order | None = None,
-                 _source: object | None = None) -> None:
+    def __init__(self,
+                 base: SupportsGetValue | SupportsDecimal,
+                 modification: Modification,
+                 order: Order | None = None,
+                 source: object | None = None,
+                 ) -> None:
         """
         @params
             - _base: The base which defines the modifier's value. If it's an object with
@@ -150,17 +156,17 @@ class Modifier(SupportsGetValue):
             modifier comes from.
             """
 
-        self._base = _base if isinstance(
-            _base, SupportsGetValue) else ConstValue(Decimal(_base))
+        self._base = base if isinstance(
+            base, SupportsGetValue) else ConstValue(Decimal(base))
 
-        self._modification = _modification
+        self._modification = modification
 
         assert self._modification.value in ORDER_VALUES, (
             "Inappropriate modification value, expected to be in"
             f"{str(ORDER_VALUES)}, but became {self._modification.value}.")
-        self._order: Order = _order if _order is not None else self._modification.value
+        self._order: Order = order if order is not None else self._modification.value
 
-        self._source = _source
+        self._source = source
 
     @property
     def order(self) -> Order:
@@ -180,8 +186,8 @@ class Modifier(SupportsGetValue):
 
 class Stat(SupportsGetValue, ABC):
 
-    def __init__(self, _base: SupportsDecimal) -> None:
-        self._base = Decimal(_base)
+    def __init__(self, base: SupportsDecimal) -> None:
+        self._base = Decimal(base)
         self._modifiers: list[Modifier] = []
 
     @property
@@ -261,19 +267,24 @@ class Stat(SupportsGetValue, ABC):
 
 class BoundedStat(Stat):
 
-    def __init__(self, _base: SupportsDecimal, _lower_bound: SupportsDecimal | None,
-                 _upper_bound: SupportsDecimal | None, _modified_upper_bound: SupportsDecimal | None) -> None:
-        if _upper_bound is None and _modified_upper_bound is not None:
+    def __init__(self,
+                 base: SupportsDecimal,
+                 lower_bound: SupportsDecimal | None,
+                 upper_bound: SupportsDecimal | None,
+                 modified_upper_bound: SupportsDecimal | None,
+                 ) -> None:
+
+        if upper_bound is None and modified_upper_bound is not None:
             raise ValueError(
                 "Stat upper bound cannot be None type if modified upper bound is given.")
 
-        super().__init__(_base)
-        self._lower_bound = _lower_bound if _lower_bound is None else Decimal(
-            _lower_bound)
-        self._upper_bound = _upper_bound if _upper_bound is None else Decimal(
-            _upper_bound)
-        self._modified_upper_bound = _modified_upper_bound if _modified_upper_bound is None else Decimal(
-            _modified_upper_bound)
+        super().__init__(base)
+        self._lower_bound = lower_bound if lower_bound is None else Decimal(
+            lower_bound)
+        self._upper_bound = upper_bound if upper_bound is None else Decimal(
+            upper_bound)
+        self._modified_upper_bound = modified_upper_bound if modified_upper_bound is None else Decimal(
+            modified_upper_bound)
 
         if any([not self._lower_bound is None and self._base < self._lower_bound,
                 not self._upper_bound is None and self._base > self._upper_bound]):
@@ -284,7 +295,7 @@ class BoundedStat(Stat):
             assert self._upper_bound is not None
             if self._modified_upper_bound < self._upper_bound:
                 raise ValueError("Modified upper bound cannot be less than upper bound"
-                                 f"(Got modified = {_modified_upper_bound}, standard = {_upper_bound})")
+                                 f"(Got modified = {modified_upper_bound}, standard = {upper_bound})")
 
     def is_capped(self) -> bool:
         return self._upper_bound is not None and self._base >= self._upper_bound
@@ -316,41 +327,52 @@ class PrimaryStat(BoundedStat):
     _UPPER_BOUND_DEFAULT: ClassVar = Decimal(100)
     _MODIFIED_UPPER_BOUND_DEFAULT: ClassVar = Decimal(125)
 
-    def __init__(self, _base: SupportsDecimal, _lower_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
-                 _upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
-                 _modified_upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN) -> None:
-        _lower_bound = self._LOWER_BOUND_DEFAULT if _lower_bound is Sentinel.NOT_GIVEN else _lower_bound
-        _upper_bound = self._UPPER_BOUND_DEFAULT if _upper_bound is Sentinel.NOT_GIVEN else _upper_bound
-        _modified_upper_bound = self._MODIFIED_UPPER_BOUND_DEFAULT if _modified_upper_bound is Sentinel.NOT_GIVEN else _modified_upper_bound
+    def __init__(self,
+                 base: SupportsDecimal,
+                 lower_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 modified_upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 ) -> None:
 
-        super().__init__(_base, _lower_bound, _upper_bound, _modified_upper_bound)
+        lower_bound = self._LOWER_BOUND_DEFAULT if lower_bound is Sentinel.NOT_GIVEN else lower_bound
+        upper_bound = self._UPPER_BOUND_DEFAULT if upper_bound is Sentinel.NOT_GIVEN else upper_bound
+        modified_upper_bound = self._MODIFIED_UPPER_BOUND_DEFAULT if modified_upper_bound is Sentinel.NOT_GIVEN else modified_upper_bound
+
+        super().__init__(base, lower_bound, upper_bound, modified_upper_bound)
 
 
 class SecondaryStat(BoundedStat):
 
-    def __init__(self, _base: SupportsDecimal, _lower_bound: SupportsDecimal | None = Decimal(0),
-                 _upper_bound: SupportsDecimal | None = None,
-                 _modified_upper_bound: SupportsDecimal | None = None) -> None:
+    def __init__(self,
+                 base: SupportsDecimal,
+                 lower_bound: SupportsDecimal | None = Decimal(0),
+                 upper_bound: SupportsDecimal | None = None,
+                 modified_upper_bound: SupportsDecimal | None = None,
+                 ) -> None:
 
-        super().__init__(_base, _lower_bound, _upper_bound, _modified_upper_bound)
+        super().__init__(base, lower_bound, upper_bound, modified_upper_bound)
 
 
 class Defence(SecondaryStat):
 
     def __init__(self, _base: SupportsDecimal) -> None:
-        super().__init__(_base, _lower_bound=None,
-                         _upper_bound=None, _modified_upper_bound=None)
+        super().__init__(_base, lower_bound=None,
+                         upper_bound=None, modified_upper_bound=None)
 
 
 class Resist(SecondaryStat):
 
-    def __init__(self, _base: SupportsDecimal, _base_max: SupportsDecimal | None = None,
-                 _growth: SupportsDecimal = Decimal(0), _growth_max: SupportsDecimal = Decimal(0)) -> None:
+    def __init__(self,
+                 base: SupportsDecimal,
+                 base_max: SupportsDecimal | None = None,
+                 growth: SupportsDecimal = Decimal(0),
+                 growth_max: SupportsDecimal = Decimal(0),
+                 ) -> None:
 
-        _base = DecimalRange(_base, _base_max).get_random_value(
-        ) if _base_max is not None else Decimal(_base)
-        super().__init__(_base, _lower_bound=Decimal(0), _upper_bound=None)
-        self._growth = DecimalRange(_growth, _growth_max)
+        base = DecimalRange(base, base_max).get_random_value(
+        ) if base_max is not None else Decimal(base)
+        super().__init__(base, lower_bound=Decimal(0), upper_bound=None)
+        self._growth = DecimalRange(growth, growth_max)
 
         if self._growth.lower < 0 or self._growth.upper < 0:
             raise ValueError("Growth value cannot be less than zero.")
@@ -366,8 +388,8 @@ class Resist(SecondaryStat):
 
 class DamageReduction(SecondaryStat):
 
-    def __init__(self, _base: SupportsDecimal) -> None:
-        super().__init__(_base, _lower_bound=0, _upper_bound=None, _modified_upper_bound=None)
+    def __init__(self, base: SupportsDecimal) -> None:
+        super().__init__(base, lower_bound=0, upper_bound=None, modified_upper_bound=None)
 
 
 class LoadStatus(Enum):
@@ -379,7 +401,7 @@ class LoadStatus(Enum):
     RED = 5
 
 
-class CarryingCapacity(BoundedStat):
+class CarryingCapacity(SecondaryStat):
 
     __LOAD_LEVELS: ClassVar = {
         Decimal('1.0'): LoadStatus.RED,
@@ -389,9 +411,9 @@ class CarryingCapacity(BoundedStat):
         Decimal('0.0'): LoadStatus.WHITE,
     }
 
-    def __init__(self, _base: SupportsDecimal) -> None:
-        super().__init__(_base, _lower_bound=Decimal(0),
-                         _upper_bound=None, _modified_upper_bound=None)
+    def __init__(self, base: SupportsDecimal) -> None:
+        super().__init__(base, lower_bound=Decimal(0),
+                         upper_bound=None, modified_upper_bound=None)
         self._load = Decimal(0)
 
     def __str__(self) -> str:
@@ -422,9 +444,9 @@ class CarryingCapacity(BoundedStat):
 
 class ResourceRegeneration(SecondaryStat):
 
-    def __init__(self, _base: SupportsDecimal) -> None:
-        super().__init__(_base, _lower_bound=Decimal(0),
-                         _upper_bound=None, _modified_upper_bound=None)
+    def __init__(self, base: SupportsDecimal) -> None:
+        super().__init__(base, lower_bound=Decimal(0),
+                         upper_bound=None, modified_upper_bound=None)
 
 
 # class ResourceDrained(Exception):
@@ -433,18 +455,24 @@ class ResourceRegeneration(SecondaryStat):
 
 class Resource(SecondaryStat):
 
-    def __init__(self, _base: SupportsDecimal, _base_max: SupportsDecimal | None = None,
-                 _regeneration: SupportsDecimal | ResourceRegeneration = Decimal(
+    def __init__(self,
+                 base: SupportsDecimal,
+                 base_max: SupportsDecimal | None = None,
+                 regeneration: SupportsDecimal | ResourceRegeneration = Decimal(
                      0),
-                 _growth: SupportsDecimal = Decimal(0), _growth_max: SupportsDecimal = Decimal(0),
-                 _lower_bound: SupportsDecimal | None = Decimal(0), _upper_bound: SupportsDecimal | None = None, _modified_upper_bound: SupportsDecimal | None = None) -> None:
+                 growth: SupportsDecimal = Decimal(0),
+                 growth_max: SupportsDecimal = Decimal(0),
+                 lower_bound: SupportsDecimal | None = Decimal(0),
+                 upper_bound: SupportsDecimal | None = None,
+                 modified_upper_bound: SupportsDecimal | None = None,
+                 ) -> None:
 
-        _base = DecimalRange(_base, _base_max).get_random_value(
-        ) if _base_max is not None else Decimal(_base)
-        super().__init__(_base, _lower_bound, _upper_bound, _modified_upper_bound)
-        self._growth = DecimalRange(_growth, _growth_max)
-        self._regeneration = _regeneration if isinstance(
-            _regeneration, ResourceRegeneration) else ResourceRegeneration(_regeneration)
+        base = DecimalRange(base, base_max).get_random_value(
+        ) if base_max is not None else Decimal(base)
+        super().__init__(base, lower_bound, upper_bound, modified_upper_bound)
+        self._growth = DecimalRange(growth, growth_max)
+        self._regeneration = regeneration if isinstance(
+            regeneration, ResourceRegeneration) else ResourceRegeneration(regeneration)
         self._current = self._base
 
         # self._aware_of_resource_drain = False if self._current > Decimal(
@@ -468,21 +496,29 @@ class Resource(SecondaryStat):
     def regeneration(self) -> ResourceRegeneration:
         return self._regeneration
 
+    @override
+    def add_modifier(self, modifier: Modifier, regeneration: bool = False) -> None:
+        if regeneration:
+            self.regeneration.add_modifier(modifier)
+        else:
+            super().add_modifier(modifier)
+
+    @override
+    def remove_modifier(self, modifier: Modifier, regeneration: bool = False) -> None:
+        if regeneration:
+            self.regeneration.remove_modifier(modifier)
+        else:
+            super().remove_modifier(modifier)
+
+    @override
+    def remove_source(self, source: object) -> None:
+        super().remove_source(source)
+        self.regeneration.remove_source(source)
+
     # @override
     # def add_modifier(self, modifier: Modifier) -> None:
     #     super().add_modifier(modifier)
     #     self._update_current()
-
-    # @override
-    # def calculate_value_with_temporary_modifiers(self, temporary_modifiers: list[Modifier]) -> Decimal:
-    #     modifiers = self._modifiers + temporary_modifiers
-    #     modifiers.sort(key=lambda m: m.order)
-    #     value = self._calculate_modified_value(modifiers)
-
-    #     self._current = min(self._current, value)
-    #     self._update_current()
-
-    #     return self._adjusted_value(value)
 
     def grow(self) -> Decimal:
         before = self.base
@@ -534,23 +570,31 @@ class Resource(SecondaryStat):
 
 class Armour(Resource):
 
-    def __init__(self, _base: SupportsDecimal, _base_max: SupportsDecimal | None = None,
-                 _regeneration: SupportsDecimal | ResourceRegeneration = Decimal(
+    def __init__(self,
+                 base: SupportsDecimal,
+                 base_max: SupportsDecimal | None = None,
+                 regeneration: SupportsDecimal | ResourceRegeneration = Decimal(
                      0),
-                 _growth: SupportsDecimal = Decimal(0), _growth_max: SupportsDecimal = Decimal(0)) -> None:
+                 growth: SupportsDecimal = Decimal(0),
+                 growth_max: SupportsDecimal = Decimal(0),
+                 ) -> None:
 
-        super().__init__(_base, _base_max, _regeneration, _growth, _growth_max,
-                         _lower_bound=None, _upper_bound=None, _modified_upper_bound=None)
+        super().__init__(base, base_max, regeneration, growth, growth_max,
+                         lower_bound=None, upper_bound=None, modified_upper_bound=None)
 
 
 class Skill(PrimaryStat, ExponentialLevelSystem):
 
-    def __init__(self, _base: SupportsDecimal, _scale: SupportsDecimal,
-                 _lower_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
-                 _upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
-                 _modified_upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN) -> None:
-        super().__init__(_base, _lower_bound, _upper_bound, _modified_upper_bound)
-        ExponentialLevelSystem.__init__(self, _scale)
+    def __init__(self,
+                 base: SupportsDecimal,
+                 scale: SupportsDecimal,
+                 lower_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 modified_upper_bound: SupportsDecimal | None | Sentinel = Sentinel.NOT_GIVEN,
+                 ) -> None:
+
+        super().__init__(base, lower_bound, upper_bound, modified_upper_bound)
+        ExponentialLevelSystem.__init__(self, scale)
 
     @property
     def level(self) -> int:
@@ -587,18 +631,18 @@ class Skill(PrimaryStat, ExponentialLevelSystem):
 
 class DamageBonus(BoundedStat):
 
-    def __init__(self, _base: SupportsDecimal) -> None:
-        super().__init__(_base, _lower_bound=Decimal(0),
-                         _upper_bound=None, _modified_upper_bound=None)
+    def __init__(self, base: SupportsDecimal) -> None:
+        super().__init__(base, lower_bound=Decimal(0),
+                         upper_bound=None, modified_upper_bound=None)
 
 
 class Damage(BoundedStat):
 
-    def __init__(self, _base: SupportsDecimal, _bonus: SupportsDecimal | None = None) -> None:
-        super().__init__(_base, _lower_bound=Decimal(0),
-                         _upper_bound=None, _modified_upper_bound=None)
+    def __init__(self, base: SupportsDecimal, bonus: SupportsDecimal | None = None) -> None:
+        super().__init__(base, lower_bound=Decimal(0),
+                         upper_bound=None, modified_upper_bound=None)
         self._bonus = DamageBonus(
-            _bonus) if _bonus is not None else DamageBonus(Decimal(0))
+            bonus) if bonus is not None else DamageBonus(Decimal(0))
 
     @property
     def bonus(self) -> DamageBonus:
@@ -608,6 +652,20 @@ class Damage(BoundedStat):
         damage_min = self.get_value(optional_modifiers)
         damage_max = damage_min + self.bonus.get_value(optional_modifiers)
         return roll_decimal(damage_min, damage_max)
+
+    @override
+    def add_modifier(self, modifier: Modifier, bonus: bool = False) -> None:
+        if bonus:
+            self.bonus.add_modifier(modifier)
+        else:
+            super().add_modifier(modifier)
+
+    @override
+    def remove_modifier(self, modifier: Modifier, bonus: bool = False) -> None:
+        if bonus:
+            self.bonus.remove_modifier(modifier)
+        else:
+            super().remove_modifier(modifier)
 
     @override
     def remove_source(self, source: object) -> None:
@@ -726,8 +784,8 @@ S = TypeVar("S", bound=Stat)
 
 class StatBlock(Mapping[ST, S]):
 
-    def __init__(self, _stats: dict[ST, S]) -> None:
-        self._stats: dict[ST, S] = _stats
+    def __init__(self, stats: dict[ST, S]) -> None:
+        self._stats: dict[ST, S] = stats
 
     def __getitem__(self, __key: ST) -> S:
         return self._stats[__key]
@@ -793,20 +851,20 @@ SB = TypeVar("SB", bound=StatBlock[Any, Any])
 class StatSheet:
 
     def __init__(self, *blocks: StatBlock[Any, Any]) -> None:
-        self._stats = {type(block): block for block in blocks}
+        self._blocks = {type(block): block for block in blocks}
 
     def __iter__(self) -> Iterator[StatBlock[Any, Any]]:
-        return self._stats.values().__iter__()
+        return self._blocks.values().__iter__()
 
     def add(self, block: SB) -> None:
-        self._stats[type(block)] = block
+        self._blocks[type(block)] = block
 
-    def get(self, key: Type[SB]) -> SB:
+    def get(self, block: Type[SB]) -> SB:
         # The keys are always supposed to be the types of values.
-        return cast(SB, self._stats[key])
+        return cast(SB, self._blocks[block])
 
     def remove_source(self, source: object) -> None:
-        for block in self._stats.values():
+        for block in self._blocks.values():
             block.remove_source(source)
 
 

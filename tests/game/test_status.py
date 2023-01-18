@@ -37,7 +37,7 @@ class TestStatus:
                 "cannot get rid of this status", [], None)
 
     def test_end_turn_decreases_duration(self) -> None:
-        status = Status("", _duration=5)
+        status = Status("", duration=5)
         status.end_turn()
 
         assert status.duration == 4
@@ -69,14 +69,14 @@ class TestUniqueStatus:
     @pytest.mark.parametrize("marks", ([SourceMark.BLESS], [], None))
     def test_marks_will_contain_unique_mark_after_construction(self, marks: list[SourceMark] | None, unique_mark: SourceMark) -> None:
         status = UniqueStatus(
-            "", unique_mark, OverrideBehaviour.ALWAYS_PASS, _marks=marks)
+            "", unique_mark, OverrideBehaviour.ALWAYS_PASS, marks=marks)
 
         assert unique_mark in status.marks
 
     def test_unique_mark_will_not_be_added_to_marks_if_already_present(self, unique_mark: SourceMark) -> None:
         marks = [unique_mark]
         status = UniqueStatus(
-            "", unique_mark, OverrideBehaviour.ALWAYS_PASS, _marks=marks)
+            "", unique_mark, OverrideBehaviour.ALWAYS_PASS, marks=marks)
 
         assert len(status.marks) == 1
 
@@ -85,11 +85,11 @@ class TestStatusBar:
 
     @pytest.fixture
     def confusion(self) -> Status:
-        return Status("is confused", [SourceMark.ILLUSIONS, SourceMark.MENTAL], _duration=1)
+        return Status("is confused", [SourceMark.ILLUSIONS, SourceMark.MENTAL], duration=1)
 
     @pytest.fixture
     def unique_curse(self) -> UniqueStatus:
-        return UniqueStatus("is cursed", SourceMark.CURSE, OverrideBehaviour.ALWAYS_PASS, _duration=1)
+        return UniqueStatus("is cursed", SourceMark.CURSE, OverrideBehaviour.ALWAYS_PASS, duration=1)
 
     @pytest.fixture
     def status_bar(self) -> StatusBar:
@@ -138,12 +138,12 @@ class TestStatusBar:
 
         assert status not in status_bar.expired
 
-    @pytest.mark.parametrize("status", (Status("", [], _duration=2),
+    @pytest.mark.parametrize("status", (Status("", [], duration=2),
                                         Status(
-                                            "", [SourceMark.BLESS], _duration=None),
+                                            "", [SourceMark.BLESS], duration=None),
                                         UniqueStatus(
-                                            "", SourceMark.BLESS, OverrideBehaviour.ALWAYS_PASS, _duration=2),
-                                        UniqueStatus("", SourceMark.BLESS, OverrideBehaviour.ALWAYS_PASS, _duration=None)))
+                                            "", SourceMark.BLESS, OverrideBehaviour.ALWAYS_PASS, duration=2),
+                                        UniqueStatus("", SourceMark.BLESS, OverrideBehaviour.ALWAYS_PASS, duration=None)))
     def test_ending_turn_does_not_move_status_to_expired_if_duration_does_not_expire(self, status_bar: StatusBar, status: Status) -> None:
         status_bar.add_status(status)
         status_bar.end_turn()
@@ -179,7 +179,7 @@ class TestStatusBar:
 
     @pytest.fixture
     def non_overridable(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.ALWAYS_PASS, _overridable=False)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.ALWAYS_PASS, overridable=False)
 
     def test_forced_override_behaviour_overrides_non_overridable(self, status_bar: StatusBar, non_overridable: UniqueStatus, shared_mark: SourceMark) -> None:
         status_bar.add_status(non_overridable)
@@ -198,11 +198,11 @@ class TestStatusBar:
 
     @pytest.fixture
     def shorter_duration(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_DURATION, _duration=1)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_DURATION, duration=1)
 
     @pytest.fixture
     def longer_duration(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_DURATION, _duration=2)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_DURATION, duration=2)
 
     @pytest.mark.parametrize("old, new", [
         (lazy_fixture('shorter_duration'), lazy_fixture('longer_duration')),
@@ -216,11 +216,11 @@ class TestStatusBar:
 
     @pytest.fixture
     def lower_priority_value(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, _priority=1)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, priority=1)
 
     @pytest.fixture
     def higher_priority_value(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, _priority=2)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, priority=2)
 
     @pytest.mark.parametrize("old, new", [
         (
@@ -238,11 +238,11 @@ class TestStatusBar:
 
     @pytest.fixture
     def even_priority_longer_duration(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, _priority=1, _duration=2)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, priority=1, duration=2)
 
     @pytest.fixture
     def even_priority_shorter_duration(self, shared_mark: SourceMark) -> UniqueStatus:
-        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, _priority=1, _duration=1)
+        return UniqueStatus("", shared_mark, OverrideBehaviour.PICK_BY_PRIORITY, priority=1, duration=1)
 
     @pytest.mark.parametrize("old, new", [
         (
@@ -262,9 +262,9 @@ class TestStatusBar:
     @pytest.mark.parametrize('behaviour', (OverrideBehaviour.PICK_BY_PRIORITY, OverrideBehaviour.PICK_BY_DURATION))
     def test_old_status_is_kept_if_priorities_and_durations_are_even(self, status_bar: StatusBar, shared_mark: SourceMark, behaviour: OverrideBehaviour) -> None:
         old = UniqueStatus("", shared_mark, behaviour,
-                           _duration=1, _priority=1)
+                           duration=1, priority=1)
         new = UniqueStatus("", shared_mark, behaviour,
-                           _duration=1, _priority=1)
+                           duration=1, priority=1)
 
         status_bar.add_status(old)
         status_bar.add_status(new)
