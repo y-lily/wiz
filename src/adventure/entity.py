@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
+import pygame
 from pygame.rect import Rect
 from pygame.sprite import Sprite
 from pygame.surface import Surface
@@ -10,7 +11,7 @@ from typing_extensions import override
 from src.adventure.animation import Animation
 from src.adventure.trigger import Trigger
 
-COLLISION_BOX_WIDTH_RATIO = 0.35
+COLLISION_BOX_WIDTH_RATIO = 0.25
 COLLISION_BOX_HEIGHT_RATIO = 0.25
 
 
@@ -52,10 +53,12 @@ class MovingEntity(Entity):
         super().__init__(image, position)
         self._last_stable_ground = list(self._position)
 
+        mask = pygame.mask.from_surface(image)
+        width, height = mask.get_size()
         self._collision_box = Rect(0,
                                    0,
-                                   self.rect.width * COLLISION_BOX_WIDTH_RATIO,
-                                   self.rect.height * COLLISION_BOX_HEIGHT_RATIO)
+                                   width * COLLISION_BOX_WIDTH_RATIO,
+                                   height * COLLISION_BOX_HEIGHT_RATIO)
 
         self._idle_animation = idle_animation
         self._walk_animation = walk_animation
