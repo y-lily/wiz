@@ -1,9 +1,10 @@
+import pathlib
 from typing import Optional, Sequence
 
 import pygame
 from pygame.surface import Surface
 
-from src.adventure.shared import Path
+from .shared import RESOURCE_DIR, Path
 
 
 class SpriteSheet:
@@ -15,7 +16,7 @@ class SpriteSheet:
             self._sheet = pygame.image.load(image_path).convert()
 
     def image_at(self,
-                 rect: tuple[int, int, int, int],
+                 rect: tuple[int, ...],
                  alpha: bool = False,
                  colorkey: Optional[tuple[int, ...]] = None,
                  ) -> Surface:
@@ -38,7 +39,7 @@ class SpriteSheet:
         return image
 
     def images_at(self,
-                  rects: Sequence[tuple[int, int, int, int]],
+                  rects: Sequence[tuple[int, ...]],
                   alpha: bool = False,
                   colorkey: Optional[tuple[int, ...]] = None,
                   ) -> list[Surface]:
@@ -46,7 +47,7 @@ class SpriteSheet:
         return [self.image_at(rect, alpha, colorkey) for rect in rects]
 
     def split(self,
-              rect: tuple[int, int, int, int],
+              rect: tuple[int, ...],
               alpha: bool = False,
               colorkey: Optional[tuple[int, ...]] = None,
               ) -> list[Surface]:
@@ -58,3 +59,16 @@ class SpriteSheet:
             for x in range(a, self._sheet.get_width(), width)
         ]
         return self.images_at(rects, alpha, colorkey)
+
+
+class SpriteKeeper:
+
+    def __init__(self) -> None:
+        self._sprites: dict[pathlib.Path, SpriteSheet] = {}
+
+    def sprite(self, relative_path: str, alpha: bool) -> SpriteSheet:
+        path = RESOURCE_DIR / relative_path
+        try:
+            return self._sprites[path]
+        except KeyError:
+            return self._sprites.setdefault(path, SpriteSheet(path, alpha))

@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-import pathlib
-from typing import Optional, Type, TypeVar
-from xml.etree import ElementTree
+from contextlib import suppress
+from typing import Optional
 
 import pygame
 from pygame.surface import Surface
 
-from src.adventure.shared import Direction, Path
-from src.adventure.sprite_sheet import SpriteSheet
+from . import shared
+from .lua_defs import LuaEntityTable
+from .shared import Direction
+from .sprite_sheet import SpriteSheet
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 
 class Animation:
@@ -24,6 +30,7 @@ class Animation:
         self._frame_rate = frame_rate
         self.state = initial_state if initial_state is not None else Direction.DOWN
         self._current_frame: float = initial_frame
+        self._default_image = self.get_image()
 
     @property
     def current_frame(self) -> int:
@@ -33,117 +40,63 @@ class Animation:
     def current_frame(self, new_value: int) -> None:
         self._current_frame = new_value
 
+    def __getitem__(self, direction: Direction) -> list[Surface]:
+        return self._frames[direction]
+
     def update(self, dt: float) -> None:
         self._current_frame += self._frame_rate * dt
         if self._current_frame >= len(self._frames[self.state]):
             self._current_frame = 0
 
     def get_image(self) -> Surface:
-        return self._frames[self.state][self.current_frame]
+        with suppress(KeyError):
+            return self._frames[self.state][self.current_frame]
+        return self._default_image
 
-    @staticmethod
-    def from_xml_data(data: ElementTree.Element,
-                      res_dir: Path,
-                      atlas: Optional[SpriteSheet] = None,
-                      ) -> Animation:
+    @classmethod
+    def from_table(cls,
+                   table: LuaEntityTable,
+                   atlas: SpriteSheet,
+                   ) -> dict[str, Self]:
 
-        res_dir = pathlib.Path(res_dir)
-        alpha = _get_boolean(data.attrib, "alpha", default=False)
-        atlas = atlas if atlas is not None else SpriteSheet(
-            res_dir / data.attrib["source"], alpha=alpha)
-        width = int(data.attrib["framewidth"])
-        height = int(data.attrib["frameheight"])
-        frame_rate = int(data.attrib["framerate"])
-        colorkey = _get_tuple(data.attrib, "colorkey", target_type=int)
-        initial_frame = int(data.get("initial_frame", 0))
-        initial_state = _get_converted(data.attrib,
-                                       "initial_state",
-                                       default=None,
-                                       target_type=Direction)
+        sprites = atlas.split(
+            (0, 0, table.framewidth, table.frameheight), alpha=table.alpha)
+        framerate = table.framerate
 
-        sprites = atlas.split((0, 0, width, height),
-                              alpha=alpha,
-                              colorkey=colorkey)
+        animations = {}
+        for animation, animation_data in table.animations.items():
+            frames = {}
+            for direction, frames_data in animation_data.items():
+                frames[Direction(direction)] = [
+                    sprites[i] for i in frames_data.values()]
 
-        frames: dict[Direction, list[Surface]] = {}
+            if table.flip == "right-left":
+                frames |= _flipped_left(frames)
+            elif table.flip is None:
+                pass
+            else:
+                shared.assert_never(table.flip)
 
-        for direction_data in data:
-            frames[Direction(direction_data.tag)] = [
-                sprites[i] for i in _get_tuple(direction_data.attrib, "frames", target_type=int)]
+            animations[animation] = Animation(frames=frames,
+                                              frame_rate=framerate)
 
-        frames |= _get_inverted_right_to_left(frames)
-
-        return Animation(frames=frames,
-                         frame_rate=frame_rate,
-                         initial_state=initial_state,
-                         initial_frame=initial_frame)
+        return animations
 
 
-T = TypeVar("T")
-
-
-def _get_converted(data: dict[str, str],
-                   field_name: str,
-                   default: Optional[T] = None,
-                   target_type: Type[T] = str,
-                   ) -> Optional[T]:
-
-    raw = data.get(field_name, default)
-
-    if raw == default:
-        return default
-
-    return target_type(raw)
-
-
-def _get_boolean(data: dict[str, str],
-                 field_name: str,
-                 default: Optional[bool] = False,
-                 ) -> Optional[bool]:
-    # Requires special attention.
-
-    raw = data.get(field_name, default)
-
-    if raw == default:
-        return default
-
-    if raw.lower() == "true":
-        return True
-    elif raw.lower() == "false":
-        return False
-    else:
-        return default
-
-
-def _get_tuple(data: dict[str, str],
-               field_name: str,
-               default: Optional[T] = None,
-               target_type: Type[T] = str,
-               sep: str = ", ",
-               ) -> Optional[tuple[T, ...]]:
-
-    unparsed = data.get(field_name, default)
-
-    if unparsed == default:
-        return default
-
-    return tuple(target_type(x) for x in unparsed.split(sep))
-
-
-def _get_inverted_right_to_left(frames: dict[Direction, list[Surface]]) -> dict[Direction, list[Surface]]:
-    inverted_frames = {}
+def _flipped_left(source: dict[Direction, list[Surface]]) -> dict[Direction, list[Surface]]:
+    flipped: dict[Direction, list[Surface]] = {}
 
     supported_directions = {Direction.DOWNRIGHT: Direction.DOWNLEFT,
                             Direction.RIGHT: Direction.LEFT,
                             Direction.UPRIGHT: Direction.UPLEFT}
 
-    for direction in frames.keys():
+    for direction, frames in source.items():
         try:
-            inverted_direction = supported_directions[direction]
+            flipped_direction = supported_directions[direction]
         except KeyError:
             continue
 
-        inverted_frames[inverted_direction] = [
-            pygame.transform.flip(frame, True, False) for frame in frames[direction]]
+        flipped[flipped_direction] = [
+            pygame.transform.flip(frame, True, False) for frame in frames]
 
-    return inverted_frames
+    return flipped

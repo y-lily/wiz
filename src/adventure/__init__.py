@@ -1,5 +1,13 @@
-from .adventure_character import AdventureHero
-from .camera import AdventureCamera
-from .trigger import Trigger
+from .adventure_map import AdventureMap
+from .animation import Animation
+from .character import NPC, Character, Hero
+from .game import Game
 
-__all__ = ["AdventureHero", "AdventureCamera", "Trigger"]
+# from .config import *
+
+__all__ = ["AdventureMap",
+           "Game",
+           "Animation",
+           "Hero",
+           "NPC",
+           "Character"]

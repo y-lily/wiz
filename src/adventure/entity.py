@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import pygame
 from pygame.rect import Rect
@@ -8,9 +8,12 @@ from pygame.sprite import Sprite
 from pygame.surface import Surface
 from typing_extensions import override
 
-from src.adventure.animation import Animation
-from src.adventure.trigger import Trigger
+from .animation import Animation
+from .lua_defs import LuaPositionTable
+from .shared import Direction
 
+if TYPE_CHECKING:
+    from .adventure_map import TriggerZone
 COLLISION_BOX_WIDTH_RATIO = 0.25
 COLLISION_BOX_HEIGHT_RATIO = 0.25
 
@@ -18,21 +21,26 @@ COLLISION_BOX_HEIGHT_RATIO = 0.25
 class Entity(Sprite):
 
     def __init__(self,
+                 *args: object,
                  image: Surface,
-                 position: Optional[tuple[float, float]] = None,
+                 position: Optional[LuaPositionTable] = None,
+                 **kwargs: object,
                  ) -> None:
 
         super().__init__()
         self.image = image
         self.rect: Rect = image.get_rect()
-        self._position = list(
-            position) if position is not None else list(self.rect.topleft)
+        self._position: list[float] = [
+            position["x"], position["y"]] if position is not None else list(self.rect.topleft)
+        self._match_position()
 
     def set_position(self, x: int, y: int) -> None:
         self._position = [x, y]
+        self._match_position()
 
     def update(self, dt: float) -> None:
-        self._match_position()
+        # self._match_position()
+        pass
 
     def _match_position(self) -> None:
         self.rect.topleft = (int(self._position[0]),
@@ -42,51 +50,71 @@ class Entity(Sprite):
 class MovingEntity(Entity):
 
     def __init__(self,
-                 idle_animation: Animation,
-                 walk_animation: Animation,
+                 *args: object,
+                 animations: dict[str, Animation],
                  movement_speed: float,
+                 state: str = "initial",
+                 face_direction: str | Direction,
+                 frame: int = 0,
                  image: Optional[Surface] = None,
-                 position: Optional[tuple[float, float]] = None,
+                 position: Optional[LuaPositionTable] = None,
+                 **kwargs: object,
                  ) -> None:
 
-        image = image if image is not None else idle_animation.get_image()
-        super().__init__(image, position)
-        self._last_stable_ground = list(self._position)
+        self.state = state
+        self._face_direction = Direction(face_direction)
 
-        mask = pygame.mask.from_surface(image)
-        width, height = mask.get_size()
+        if image is not None:
+            self._default_image = image
+        else:
+            try:
+                self._default_image = animations[self.state][self._face_direction][frame]
+            except KeyError:
+                self._default_image = next(
+                    animation for animation in animations.values())[self._face_direction][frame]
+
+        self.mask = pygame.mask.from_surface(self._default_image)
+        width, height = self.mask.get_size()
         self._collision_box = Rect(0,
                                    0,
                                    width * COLLISION_BOX_WIDTH_RATIO,
                                    height * COLLISION_BOX_HEIGHT_RATIO)
 
-        self._idle_animation = idle_animation
-        self._walk_animation = walk_animation
+        super().__init__(*args,
+                         image=self._default_image,
+                         position=position,
+                         **kwargs,
+                         )
 
+        self._last_stable_ground = list(self._position)
+
+        self._animations = animations
         self._movement_speed = movement_speed
         self._velocity: list[float] = [0, 0]
-        self.movement_state = "idle"
-        self.face_direction = "down"
 
-        self._zonal_triggers: dict[int, Trigger] = {}
+        self._active_zones: set[TriggerZone] = set()
 
-    @property
-    def idle_animation(self) -> Animation:
-        return self._idle_animation
+    @ property
+    def animations(self) -> dict[str, Animation]:
+        return self._animations
 
-    @property
-    def zonal_triggers(self) -> dict[int, Trigger]:
-        return self._zonal_triggers
+    @ property
+    def active_zones(self) -> set[TriggerZone]:
+        return self._active_zones
 
-    @property
-    def walk_animation(self) -> Animation:
-        return self._walk_animation
-
-    @property
+    @ property
     def velocity(self) -> list[float]:
         return self._velocity
 
-    @property
+    @ property
+    def face_direction(self) -> Direction:
+        return self._face_direction
+
+    @ face_direction.setter
+    def face_direction(self, new: str | Direction) -> None:
+        self._face_direction = Direction(new)
+
+    @ property
     def movement_speed(self) -> float:
         return self._movement_speed
 
@@ -96,7 +124,7 @@ class MovingEntity(Entity):
     def find_all_collisions(self, zones: Sequence[Rect]) -> list[int]:
         return self._collision_box.collidelistall(zones)
 
-    def to_last_stable_ground(self) -> None:
+    def to_last_stable_ground(self, dt: float) -> None:
         self._position = list(self._last_stable_ground)
         self._match_position()
 
@@ -106,7 +134,7 @@ class MovingEntity(Entity):
         self._position[1] += self._velocity[1] * dt
         self._match_position()
 
-    @override
+    @ override
     def _match_position(self) -> None:
         super()._match_position()
         self._collision_box.midbottom = self.rect.midbottom
