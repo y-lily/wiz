@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from lupa import LuaRuntime
 from pygame.rect import Rect
@@ -12,6 +12,9 @@ from .adventure_map import AdventureMap, TriggerZone, Zone, ZoneList
 from .character import Character
 from .entity import Entity
 from .shared import Controller
+
+if TYPE_CHECKING:
+    from .game import Game
 
 
 class MapViewer(Controller):
@@ -161,11 +164,13 @@ class TriggerController:
 
     def __init__(self,
                  viewer: MapViewer,
+                 game: 'Game',
                  tracked_characters: list[Character] | None = None,
                  ) -> None:
 
         self._tracked_characters = tracked_characters if tracked_characters else []
         self._viewer = viewer
+        self._game = game
 
     def start_tracking(self, character: Character) -> None:
         self._tracked_characters.append(character)
@@ -189,13 +194,13 @@ class TriggerController:
         just_left = old.difference(new)
         old.difference_update(just_left)
         for zone in just_left:
-            zone.trigger.onExit(zone.trigger, character, self._viewer)
+            zone.trigger.onExit(zone.trigger, character, self._game)
 
         just_entered = new.difference(old)
         old.update(just_entered)
         for zone in just_entered:
-            zone.trigger.onEnter(zone.trigger, character, self._viewer)
+            zone.trigger.onEnter(zone.trigger, character, self._game)
 
     def _handle_use(self, character: Character) -> None:
         for zone in character.entity.active_zones:
-            zone.trigger.onUse(zone.trigger, character, self._viewer)
+            zone.trigger.onUse(zone.trigger, character, self._game)

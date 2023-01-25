@@ -107,7 +107,8 @@ class Game:
         self.viewer = MapViewer(self.current_map, self.screen, lua)
         self.viewer.add_sprites(self.hero.entity)
         collision_controller = CollisionController(self.viewer)
-        self.trigger_controller = TriggerController(self.viewer)
+        # self.trigger_controller = TriggerController(self.viewer)
+        self.trigger_controller = TriggerController(self.viewer, self)
         self.trigger_controller.start_tracking(self.hero)
 
         self.controllers.append(self.viewer)

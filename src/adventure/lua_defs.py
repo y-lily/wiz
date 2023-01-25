@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, Literal, Mapping, TypedDict
 if TYPE_CHECKING:
     from .adventure_map import AdventureMap
     from .character import Character
-    from .map_controller import MapViewer
+    from .game import Game
 
 
 class LuaTable(Mapping[str, object]):
@@ -61,6 +61,6 @@ class LuaPositionTable(TypedDict):
 
 class Trigger:
 
-    onEnter: Callable[[Trigger, Character, MapViewer], None]
-    onExit: Callable[[Trigger, Character, MapViewer], None]
-    onUse: Callable[[Trigger, Character, MapViewer], None]
+    onEnter: Callable[[Trigger, Character, Game], None]
+    onExit: Callable[[Trigger, Character, Game], None]
+    onUse: Callable[[Trigger, Character, Game], None]
