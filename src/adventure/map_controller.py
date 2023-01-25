@@ -1,7 +1,6 @@
-import pathlib
 from typing import Any, Optional
 
-import lupa
+from lupa import LuaRuntime
 from pygame.rect import Rect
 from pygame.sprite import Sprite
 from pygame.surface import Surface
@@ -13,11 +12,6 @@ from .adventure_map import AdventureMap, TriggerZone, Zone, ZoneList
 from .character import Character
 from .entity import Entity
 from .shared import Controller
-
-_lua_setup_path = pathlib.Path(__file__).parent / "setup.lua"
-
-lua = lupa.LuaRuntime(unpack_returned_tuples=True)
-lua.execute(open(_lua_setup_path, "r").read())
 
 
 class MapViewer(Controller):
@@ -32,9 +26,11 @@ class MapViewer(Controller):
     def __init__(self,
                  new_map: AdventureMap,
                  screen: Surface,
+                 lua: LuaRuntime
                  ) -> None:
 
         self._screen = screen
+        self.lua = lua
         self.replace_map(new_map)  # Load scroller, group, zones, sprites.
 
     @property
@@ -119,7 +115,7 @@ class MapViewer(Controller):
             for obj in new_map.collision_layer])
         self._trigger_zones = ZoneList([
             TriggerZone(Rect(obj.x, obj.y, obj.width, obj.height),
-                        lua.execute(obj.properties["trigger"])) for obj in new_map.trigger_layer])
+                        self.lua.execute(obj.properties["trigger"])) for obj in new_map.trigger_layer])
         self.add_sprites(*[char.entity for char in new_map.characters])
 
         self._hidden_layers = self._load_map_sprites(new_map)

@@ -4,60 +4,42 @@ from typing import Literal
 
 import pygame
 import pytmx
+from lupa import LuaRuntime
 from pygame.surface import Surface
 
-from . import shared
 from .adventure_map import AdventureMap
 from .character import Hero
 from .lua_defs import LuaMapTable
 from .map_controller import CollisionController, MapViewer, TriggerController
 from .shared import RESOURCE_DIR, Controller, Path
-from .sprite_sheet import SpriteKeeper
-
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
 
 
 class Game:
 
-    _sprite_keeper = SpriteKeeper()
-
     def __init__(self,
-                 start_map: AdventureMap,
-                 hero: Hero,
                  screen: Surface,
+                 map_path: Path,
+                 hero_path: Path | None = None,
+                 entry_point: str = "default",
                  ) -> None:
 
         self.running = False
         self.screen = screen
-        self.hero = hero
 
-        self.load_map(start_map)
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        map_table: LuaMapTable = lua.execute(open(map_path, "r").read())
 
-        # TODO: Remove it.
-        self.viewer.hide_layers("roof")
+        if hero_path is None:
+            hero_table = map_table
+        else:
+            hero_table = lua.execute(open(hero_path, "r").read())
 
-    @classmethod
-    def from_file(cls,
-                  path: Path,
-                  screen: Surface,
-                  ) -> Self:
+        tmx = pytmx.load_pygame(RESOURCE_DIR / map_table.tmx)
+        new_map = AdventureMap(tmx)
 
-        table: LuaMapTable = shared.load_table(path)
-        tmx = pytmx.load_pygame(RESOURCE_DIR / table.tmx)
-        map_ = AdventureMap(tmx)
-
-        assert not map_.loaded, "Cannot load twice."
-        loader = table.onLoad
-        for call in loader.values():
-            call(table, map_)
-        hero = map_.spawn_char_call(
-            "hero", table=table, char_type=Hero)
-        map_.loaded = True
-
-        return cls(map_, hero, screen)
+        self.hero = new_map.spawn_char_call(
+            "hero", table=hero_table, char_type=Hero)
+        self.load_map(new_map, lua, map_table, entry_point)
 
     # TODO
     # @classmethod
@@ -83,18 +65,54 @@ class Game:
             self.draw()
             pygame.display.update()
 
-    def load_map(self, new_map: AdventureMap) -> None:
+    def load_map_from_file(self,
+                           path: Path,
+                           entry_point: str = "default",
+                           ) -> None:
+
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        with open(path, "r") as file:
+            table: LuaMapTable = lua.execute(file.read())
+
+        tmx = pytmx.load_pygame(RESOURCE_DIR / table.tmx)
+        map_ = AdventureMap(tmx)
+        self.load_map(new_map=map_, lua=lua, table=table,
+                      entry_point=entry_point)
+
+    def load_map(self,
+                 new_map: AdventureMap,
+                 lua: LuaRuntime,
+                 table: LuaMapTable,
+                 entry_point: str = "default",
+                 ) -> None:
+
+        assert hasattr(
+            self, "hero"), "Cannot load a map when the hero does not exist."
+        assert not new_map.loaded, "Cannot load twice."
+
+        loader = table.onLoad
+        for call in loader.values():
+            call(table, new_map)
+        new_map.loaded = True
+
+        spawn = table.entryPoints[entry_point]
+        self.hero.entity.set_position(spawn["x"], spawn["y"])
+        new_map.add_characters(self.hero)
         self.current_map = new_map
-        self.viewer = MapViewer(new_map, self.screen)
-        self.viewer.add_characters(self.hero)
-        self.collision_controller = CollisionController(self.viewer)
+        self._load_controllers(lua)
+
+    def _load_controllers(self, lua: LuaRuntime) -> None:
+        self.controllers: list[Controller] = []
+
+        self.viewer = MapViewer(self.current_map, self.screen, lua)
+        self.viewer.add_sprites(self.hero.entity)
+        collision_controller = CollisionController(self.viewer)
         self.trigger_controller = TriggerController(self.viewer)
         self.trigger_controller.start_tracking(self.hero)
 
-        self.controllers: list[Controller] = [self.viewer,
-                                              self.collision_controller,
-                                              self.trigger_controller,
-                                              ]
+        self.controllers.append(self.viewer)
+        self.controllers.append(collision_controller)
+        self.controllers.append(self.trigger_controller)
 
     def _process_pygame_events(self) -> None:
         for event in pygame.event.get():
@@ -142,5 +160,3 @@ class Game:
             x = 0
 
         self.hero.movement_controller.process_player_move_command(x, y)
-
-    # def _spawn_npc_call(self, name: str, )

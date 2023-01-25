@@ -3,3 +3,10 @@
 mypy.ini
 TODO.md
 res/
+
+
+
+# Ignore WIP files.
+src/game/item.py
+src/game/rule.py
+src/adventure/actions.lua

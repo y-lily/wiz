@@ -18,6 +18,7 @@ class LuaMapTable(LuaTable):
     tmx: str
     entities: Mapping[str, LuaEntityTable]
     characters: Mapping[str, LuaCharacterTable]
+    entryPoints: Mapping[str, LuaPositionTable]
 
     onLoad: Mapping[str, Callable[[LuaMapTable, AdventureMap], None]]
 
