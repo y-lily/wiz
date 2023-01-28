@@ -248,7 +248,7 @@ class HeroMovementController(MovementController[HeroMovementState]):
 class NPCMovementState(MovementState['NPCMovementController']):
 
     def process_collision(self, dt: float) -> None:
-        raise NotImplementedError(type(self))
+        self._machine.trigger("retreat", dt=dt)
 
     def reset(self) -> None:
         raise NotImplementedError(type(self), self.name)
@@ -260,11 +260,13 @@ class NPCMovementState(MovementState['NPCMovementController']):
 class NPCIdleState(NPCMovementState):
 
     def __init__(self, name: str | Enum, machine: NPCMovementController, *args: Any, **kwargs: Any) -> None:
-        self._duration = kwargs["duration"]
+        self._duration = kwargs.get("duration", None)
         self._timer = self._duration
         super().__init__(name, machine, *args, **kwargs)
 
     def update(self, dt: float) -> None:
+        if self._timer is None:
+            return
         self._timer -= dt
         if self._timer <= 0:
             self._machine.trigger("stop_idling")
@@ -316,7 +318,7 @@ class NPCWanderingState(NPCMovementState):
         super().__init__(name, machine, *args, **kwargs)
 
     def process_collision(self, dt: float) -> None:
-        self._machine.trigger("retreat", dt=dt)
+        super().process_collision(dt)
 
         if self._has_moved:
             self._machine.trigger("stop")

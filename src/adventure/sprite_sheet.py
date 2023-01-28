@@ -69,6 +69,7 @@ class SpriteKeeper:
     def sprite(self, relative_path: str, alpha: bool) -> SpriteSheet:
         path = RESOURCE_DIR / relative_path
         try:
+            # Don't create a new spritesheet if it's already present.
             return self._sprites[path]
         except KeyError:
             return self._sprites.setdefault(path, SpriteSheet(path, alpha))

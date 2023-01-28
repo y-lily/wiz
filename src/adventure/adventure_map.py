@@ -53,7 +53,8 @@ T = TypeVar("T", bound=Zone)
 
 class ZoneList(MutableSequence[T]):
     """
-    Provides convenient interface to detect sprite's collisions."""
+    Provides a convenient interface to detect sprite's collisions.
+    """
 
     def __init__(self, zones: list[T] | None) -> None:
         self._zones = zones if zones is not None else []
