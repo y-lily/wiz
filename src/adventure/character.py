@@ -12,7 +12,7 @@ from .character_controller import (
     NPCMovementController,
 )
 from .entity import MovingEntity
-from .lua_defs import LuaCharacterTable
+from .lua_defs import LuaCharacterTable, Trigger
 from .shared import Controller
 
 
@@ -22,11 +22,12 @@ class Character(ABC):
 
     """
 
-    def __init__(self, name: str, entity: MovingEntity) -> None:
+    def __init__(self, name: str, entity: MovingEntity, trigger: Trigger | None = None) -> None:
 
         self._name = name
         self._entity = entity
         self._controllers: list[Controller]
+        self._trigger = trigger
 
     @abstractproperty
     def movement_controller(self) -> MovementController[Any]:
@@ -35,6 +36,10 @@ class Character(ABC):
     @property
     def entity(self) -> MovingEntity:
         return self._entity
+
+    @property
+    def trigger(self) -> Trigger | None:
+        return self._trigger
 
     def update(self, dt: float) -> None:
         for controller in self._controllers:

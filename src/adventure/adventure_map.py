@@ -40,6 +40,14 @@ class TriggerZone(Zone):
         self.trigger = trigger
 
 
+class CharacterTriggerZone(TriggerZone):
+
+    def __init__(self, character: Character) -> None:
+        assert character.trigger is not None
+        super().__init__(rect=character.entity.collision_box, trigger=character.trigger)
+        self.character = character
+
+
 T = TypeVar("T", bound=Zone)
 
 
@@ -189,13 +197,15 @@ class AdventureMap:
             "x": x, "y": y}
 
         entity = MovingEntity(animations=animations,
-                              movement_speed=movement_speed,   # TODO: Trasnfer to character
+                              movement_speed=movement_speed,
                               state=char_table.state,
                               face_direction=entity_table.face_direction,
                               frame=entity_table.frame,
                               position=position,
                               )
-        char = char_type(name=name, entity=entity)
+
+        trigger = char_table.trigger
+        char = char_type(name=name, entity=entity, trigger=trigger)
         char.load_controllers(char_table)
         self.add_characters(char)
         return char

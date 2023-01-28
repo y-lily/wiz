@@ -9,7 +9,7 @@ from pyscroll.data import TiledMapData
 from pytmx import TiledElement, TiledObject
 
 from .adventure_map import AdventureMap, TriggerZone, Zone, ZoneList
-from .character import Character
+from .character import Character, Hero
 from .entity import Entity
 from .shared import Controller
 
@@ -119,7 +119,19 @@ class MapViewer(Controller):
         self._trigger_zones = ZoneList([
             TriggerZone(Rect(obj.x, obj.y, obj.width, obj.height),
                         self.lua.execute(obj.properties["trigger"])) for obj in new_map.trigger_layer])
-        self.add_sprites(*[char.entity for char in new_map.characters])
+
+        # self.add_sprites(*[char.entity for char in new_map.characters])
+        for char in new_map.characters:
+            # TODO: Manipulate rendering order here.
+            self.add_sprites(char.entity)
+
+            if isinstance(char, Hero):
+                continue
+
+            # Treat NPCs as walking trigger zones as well.
+            assert char.trigger is not None
+            self._trigger_zones.append(TriggerZone(
+                rect=char.entity.rect, trigger=char.trigger))
 
         self._hidden_layers = self._load_map_sprites(new_map)
         self.show_layers()

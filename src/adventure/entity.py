@@ -102,6 +102,10 @@ class MovingEntity(Entity):
     def active_zones(self) -> set[TriggerZone]:
         return self._active_zones
 
+    @property
+    def collision_box(self) -> Rect:
+        return self._collision_box
+
     @ property
     def velocity(self) -> list[float]:
         return self._velocity

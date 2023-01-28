@@ -45,6 +45,7 @@ class LuaCharacterTable(Mapping[str, object]):
     defined_states: Mapping[int, LuaStateTable]
     position: LuaPositionTable
     movement_speed: int | None
+    trigger: Trigger
 
 
 class LuaStateTable(Mapping[str, object]):
