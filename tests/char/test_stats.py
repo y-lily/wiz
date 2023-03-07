@@ -6,10 +6,22 @@ import pytest
 from pytest_lazyfixture import lazy_fixture
 from pytest_mock import MockFixture
 
-from src.game.stats import (BoundedStat, CarryingCapacity, ConstValue,
-                            DynamicValue, SupportsGetValue, LoadStatus, Modification,
-                            Modifier, Resist, Resource, Skill, Stat)
-# from src.game.stats import ResourceDrained
+from src.char.stats import (
+    BoundedStat,
+    CarryingCapacity,
+    ConstValue,
+    DynamicValue,
+    LoadStatus,
+    Modification,
+    Modifier,
+    Resist,
+    Resource,
+    Skill,
+    Stat,
+    SupportsGetValue,
+)
+
+# from src.char.stats import ResourceDrained
 
 
 class MockValue(SupportsGetValue):
@@ -123,7 +135,7 @@ class TestStat:
 
     @pytest.fixture(scope="function", autouse=True)
     def hide_abstract_methods(self, mocker: MockFixture) -> None:
-        mocker.patch('src.game.stats.Stat.__abstractmethods__', set())
+        mocker.patch('src.char.stats.Stat.__abstractmethods__', set())
 
     @pytest.fixture
     def vitality(self) -> Stat:
@@ -184,7 +196,7 @@ class TestStat:
         vitality.add_modifier(modifier)
 
         before = vitality.get_value()
-        mocker.patch('src.game.stats.Modifier.get_value', return_value=5)
+        mocker.patch('src.char.stats.Modifier.get_value', return_value=5)
         after = vitality.get_value()
 
         assert after - before == Decimal(4)

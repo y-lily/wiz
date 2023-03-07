@@ -1,32 +1,27 @@
 from __future__ import annotations
 
 import random
-import sys
 from abc import abstractmethod
 from enum import Enum
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    Mapping,
-    Optional,
-    Type,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional, Type, TypeAlias
 
+import pygame as pg
 from bidict import bidict
+from pygame.event import Event
 from transitions import EventData, Machine, State, core
 from typing_extensions import override
 
-from .animation import Animation
+from ..sprites import Animation
+from . import keybind
+from .blueprint import StateBlueprint
 from .entity import MovingEntity
-from .lua_defs import LuaStateTable
 from .shared import Controller, Direction
 
-CoordDirTranslator: bidict[tuple[Literal[-1, 0, 1],
-                                 Literal[-1, 0, 1]],
+UnitVector: TypeAlias = Literal[-1, 0, 1]
+
+CoordDirTranslator: bidict[tuple[UnitVector,
+                                 UnitVector],
                            str] = bidict({(0, 1): "down",
                                           (1, 0): "right",
                                           (0, -1): "up",
@@ -69,13 +64,9 @@ class AnimationController(Controller):
         self._last_state = state
 
 
-TMovementController = TypeVar(
-    "TMovementController", bound='MovementController[Any]')
+class MovementState(State):
 
-
-class MovementState(State, Generic[TMovementController]):
-
-    def __init__(self, name: str | Enum, machine: TMovementController, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, name: str | Enum, machine: MovementController, *args: Any, **kwargs: Any) -> None:
         self._machine = machine
         on_enter = kwargs.get("on_enter", None)
         on_exit = kwargs.get("on_exit", None)
@@ -90,14 +81,11 @@ class MovementState(State, Generic[TMovementController]):
         raise NotImplementedError(type(self))
 
 
-TMovementState = TypeVar("TMovementState", bound=MovementState[Any])
-
-
-class MovementController(Machine, Controller, Generic[TMovementState]):
+class MovementController(Machine, Controller):
 
     transitions: list[list[str | list[str]] | dict[str, str | list[str]]]
 
-    def __init__(self, model: MovingEntity, state_table: Mapping[int, LuaStateTable], initial: str | None = None) -> None:
+    def __init__(self, model: MovingEntity, state_table: Mapping[int, StateBlueprint], initial: str | None = None) -> None:
         states = list(dict(table) for table in state_table.values())
         super().__init__(states=states, transitions=self.transitions, initial=initial,
                          auto_transitions=False, model_attribute="state", send_event=True)
@@ -150,8 +138,8 @@ class MovementController(Machine, Controller, Generic[TMovementState]):
         self.model.to_last_stable_ground(dt)
 
     def _set_model_face_direction_event(self, event: EventData) -> None:
-        x: Literal[-1, 0, 1] = event.kwargs.get("x", 0)
-        y:  Literal[-1, 0, 1] = event.kwargs.get("y", 0)
+        x: UnitVector = event.kwargs.get("x", 0)
+        y:  UnitVector = event.kwargs.get("y", 0)
 
         direction = CoordDirTranslator.get((x, y), "")
 
@@ -161,62 +149,98 @@ class MovementController(Machine, Controller, Generic[TMovementState]):
         self.model.face_direction = Direction(direction)
 
     def _set_model_unit_vectors_event(self, event: EventData) -> None:
-        x: Literal[-1, 0, 1] = event.kwargs.get('x', 0)
-        y: Literal[-1, 0, 1] = event.kwargs.get('y', 0)
+        x: UnitVector = event.kwargs.get('x', 0)
+        y: UnitVector = event.kwargs.get('y', 0)
 
         self.model.velocity[0] = x * self.model.movement_speed
         self.model.velocity[1] = y * self.model.movement_speed
 
     @override
-    def _create_state(self, name: str, default: Type[TMovementState], *args: object, **kwargs: object) -> TMovementState:
+    def _create_state(self, name: str, default: Type[MovementState], *args: object, **kwargs: object) -> MovementState:
         cls = _get_state_cls(name, default)
         return cls(name=name, machine=self, *args, **kwargs)
 
     if TYPE_CHECKING:
         @property
         def model(self) -> MovingEntity: ...
-        def get_model_state(self, model: object) -> TMovementState: ...
+        def get_model_state(self, model: object) -> MovementState: ...
         def trigger(self, _: str, **kwargs: object) -> None: ...
 
 
-class HeroMovementState(MovementState['HeroMovementController']):
+class HeroMovementState(MovementState):
 
     def process_collision(self, dt: float) -> None:
-        raise NotImplementedError(type(self))
-
-    def process_player_move_command(self, x: Literal[-1, 0, 1], y: Literal[-1, 0, 1]) -> None:
-        raise NotImplementedError(type(self))
+        self._machine.trigger("retreat", dt=dt)
 
     def update(self, dt: float) -> None:
         pass
 
+    def _get_direction_from_keypress(self) -> tuple[UnitVector, UnitVector]:
+        pressed = pg.key.get_pressed()
+        x: UnitVector = 0
+        y: UnitVector = 0
+
+        if any(pressed[key] for key in keybind.UP):
+            y = -1
+        elif any(pressed[key] for key in keybind.DOWN):
+            y = 1
+
+        if any(pressed[key] for key in keybind.LEFT):
+            x = -1
+        elif any(pressed[key] for key in keybind.RIGHT):
+            x = 1
+
+        return x, y
+
 
 class IdleState(HeroMovementState):
 
-    def process_player_move_command(self, x: Literal[-1, 0, 1], y: Literal[-1, 0, 1]) -> None:
+    def update(self, dt: float) -> None:
+        super().update(dt)
+        x, y = self._get_direction_from_keypress()
         if x or y:
             self._machine.trigger("walk", x=x, y=y)
 
 
 class WalkingState(HeroMovementState):
 
-    def process_player_move_command(self, x: Literal[-1, 0, 1], y: Literal[-1, 0, 1]) -> None:
+    def __init__(self, name: str | Enum, machine: MovementController, *args: Any, **kwargs: Any) -> None:
+        super().__init__(name, machine, *args, **kwargs)
+        self._x: UnitVector = 0
+        self._y: UnitVector = 0
+
+    def update(self, dt: float) -> None:
+        super().update(dt)
+        x, y = self._get_direction_from_keypress()
+
         if not x and not y:
+            # A temporary hack to resolve possible collisions before getting into Idle state.
+            self._machine.trigger("retreat", dt=dt)
+            self._x = x
+            self._y = y
             self._machine.trigger("stop")
         else:
-            self._machine.trigger("walk", x=x, y=y)
-
-    def process_collision(self, dt: float) -> None:
-        self._machine.trigger("retreat", dt=dt)
+            if not (x == self._x and y == self._y):
+                self._x = x
+                self._y = y
+                self._machine.trigger("walk", x=x, y=y)
 
 
 class ImmobileState(HeroMovementState):
 
-    def process_player_move_command(self, x: Literal[-1, 0, 1], y: Literal[-1, 0, 1]) -> None:
-        self._machine.trigger("look", x=x, y=y)
+    def update(self, dt: float) -> None:
+        super().update(dt)
+        x, y = self._get_direction_from_keypress()
+        if x or y:
+            self._machine.trigger("look", x=x, y=y)
 
 
-class HeroMovementController(MovementController[HeroMovementState]):
+class ChattingState(HeroMovementState):
+
+    ...
+
+
+class HeroMovementController(MovementController):
 
     transitions = [
         {"trigger": "walk", "source": ["idle", "walking"], "dest": "walking", "before": [
@@ -225,8 +249,8 @@ class HeroMovementController(MovementController[HeroMovementState]):
         {"trigger": "stop", "source": ["idle", "walking"], "dest": "idle", "before": [
             "_set_model_unit_vectors_event",]},
 
-        {"trigger": "retreat", "source": ["walking"], "dest": "idle", "before": [
-        ], "after": ["_move_model_to_last_stable_ground_event", "stop"]},
+        {"trigger": "retreat", "source": "*", "dest": "=", "before": [
+        ], "after": ["_move_model_to_last_stable_ground_event"]},
 
         {"trigger": "look", "source": "*", "dest": "=", "before": [],
             "after": ["_set_model_face_direction_event"]},
@@ -235,17 +259,17 @@ class HeroMovementController(MovementController[HeroMovementState]):
 
 
         {"trigger": "mobilize", "source": "immobile", "dest": "idle"},
-    ]
+        {"trigger": "enter_conversation", "source": "*", "dest": "chatting"},
+        {"trigger": "exit_conversation", "source": "chatting", "dest": "idle"},
 
-    def process_player_move_command(self, x: Literal[-1, 0, 1], y: Literal[-1, 0, 1]) -> None:
-        self.get_model_state(self.model).process_player_move_command(x=x, y=y)
+    ]
 
     def _create_state(self, name: str, *args: object, **kwargs: object) -> HeroMovementState:
         default = HeroMovementState
         return super()._create_state(name, default, *args, **kwargs)
 
 
-class NPCMovementState(MovementState['NPCMovementController']):
+class NPCMovementState(MovementState):
 
     def process_collision(self, dt: float) -> None:
         self._machine.trigger("retreat", dt=dt)
@@ -339,7 +363,12 @@ class NPCWanderingState(NPCMovementState):
             self._machine.trigger("stop")
 
 
-class NPCMovementController(MovementController[NPCMovementState]):
+class NPCChattingState(NPCMovementState):
+
+    ...
+
+
+class NPCMovementController(MovementController):
 
     transitions = [
         {"trigger": "stop_idling", "source": "npc_idle", "dest": "npc_planning",
@@ -351,7 +380,7 @@ class NPCMovementController(MovementController[NPCMovementState]):
         {"trigger": "stop", "source": ["npc_idle", "npc_wandering"], "dest":"npc_idle", "before": [
             "_set_model_unit_vectors_event"]},
 
-        {"trigger": "retreat", "source": ["npc_wandering"], "dest":"npc_idle", "before":[
+        {"trigger": "retreat", "source": "*", "dest": "npc_idle", "before": [
         ], "after":["_move_model_to_last_stable_ground_event", "stop"]},
 
         {"trigger": "look", "source": "*", "dest": "=", "before": [],
@@ -359,6 +388,12 @@ class NPCMovementController(MovementController[NPCMovementState]):
 
         {"trigger": "change_plans", "source": ["npc_idle", "npc_wandering"], "dest": "npc_planning",
             "before": [], "after": ["_soft_reset_current_state_event"]},
+
+        {"trigger": "enter_conversation", "source": "*", "dest": "npc_chatting",
+            "before": [], "after": []},
+
+        {"trigger": "exit_conversation", "source": "npc_chatting", "dest": "npc_idle",
+            "before": [], "after": []},
     ]
 
     def _reset_current_state_event(self, event: EventData) -> None:
@@ -374,12 +409,26 @@ class NPCMovementController(MovementController[NPCMovementState]):
         return super()._create_state(name, default, *args, **kwargs)
 
 
-def _get_state_cls(state: str, default: Type[TMovementState]) -> Type[TMovementState]:
-    parts = state.split("_")
-    for n, part in enumerate(parts):
-        if part == "npc":
-            parts[n] = part.upper()
-        else:
-            parts[n] = part.capitalize()
-    cls_name = "".join(parts) + "State"
-    return getattr(sys.modules[__name__], cls_name, default)
+class MovementStateType(Enum):
+
+    IDLE = IdleState
+    WALKING = WalkingState
+    IMMOBILE = ImmobileState
+    CHATTING = ChattingState
+    NPC_IDLE = NPCIdleState
+    NPC_PLANNING = NPCPlanningState
+    NPC_WANDERING = NPCWanderingState
+    NPC_CHATTING = NPCChattingState
+
+
+class MovementControllerType(Enum):
+
+    NPC = NPCMovementController
+    HERO = HeroMovementController
+
+
+def _get_state_cls(state: str, default: Type[MovementState]) -> Type[MovementState]:
+    try:
+        return MovementStateType[state.upper()].value
+    except KeyError:
+        return default

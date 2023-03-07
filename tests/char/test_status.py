@@ -1,8 +1,13 @@
 import pytest
 from pytest_lazyfixture import lazy_fixture
 
-from src.game.status import (OverrideBehaviour, SourceMark, Status, StatusBar,
-                             UniqueStatus)
+from src.char.status import (
+    OverrideBehaviour,
+    SourceMark,
+    Status,
+    StatusBar,
+    UniqueStatus,
+)
 
 
 class TestStatus:

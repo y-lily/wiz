@@ -1,13 +1,16 @@
 from .adventure_map import AdventureMap
-from .animation import Animation
-from .character import NPC, Character, Hero
-from .game import Game
-
-# from .config import *
+from .blueprint import AdventureMapBlueprint
+from .character import Character
+from .character_loader import CharacterLoader
+from .map_loader import MapLoader
+from .map_viewer import MapViewer
+from .shared import Controller
 
 __all__ = ["AdventureMap",
-           "Game",
-           "Animation",
-           "Hero",
-           "NPC",
-           "Character"]
+           "Character",
+           "CharacterLoader",
+           "Controller",
+           "AdventureMapBlueprint",
+           "MapLoader",
+           "MapViewer",
+           ]

@@ -1,3 +1,5 @@
+package.path = package.path .. ";./res/?.lua;./?.lua;./wiz/res/?.lua"
+
 ---@class Trigger
 local Trigger = {}
 

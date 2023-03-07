@@ -6,23 +6,23 @@ from typing import (
     MutableSequence,
     Optional,
     SupportsIndex,
-    Type,
     TypeVar,
     overload,
 )
 
+from pygame.event import Event
 from pygame.rect import Rect
 from pygame.sprite import Sprite
 from pytmx import TiledElement, TiledMap
 
-from .animation import Animation
-from .character import NPC, Character
+from ..sprites import SpriteKeeper
+from .blueprint import AdventureMapTrigger
+from .character import Character
+from .character_loader import CharacterBuilder
 from .entity import MovingEntity
-from .lua_defs import LuaMapTable, Trigger
-from .sprite_sheet import SpriteKeeper
 
 try:
-    from typing import Self
+    from typing import Self  # type: ignore [attr-defined]
 except ImportError:
     from typing_extensions import Self
 
@@ -35,7 +35,7 @@ class Zone:
 
 class TriggerZone(Zone):
 
-    def __init__(self, rect: Rect, trigger: Trigger) -> None:
+    def __init__(self, rect: Rect, trigger: AdventureMapTrigger) -> None:
         super().__init__(rect)
         self.trigger = trigger
 
@@ -56,7 +56,7 @@ class ZoneList(MutableSequence[T]):
     Provides a convenient interface to detect sprite's collisions.
     """
 
-    def __init__(self, zones: list[T] | None) -> None:
+    def __init__(self, zones: list[T] | None = None) -> None:
         self._zones = zones if zones is not None else []
 
     @overload
@@ -88,7 +88,7 @@ class ZoneList(MutableSequence[T]):
 
     @property
     def rects(self) -> list[Rect]:
-        # FIXME: Consider storing rects and updating them on get/set invocations.
+        # NOTE: Consider storing rects and updating them on get/set invocations.
         return [zone.rect for zone in self._zones]
 
     def collides_sprite(self, sprite: Sprite) -> bool:
@@ -124,17 +124,30 @@ class AdventureMap:
 
     loaded: bool = False
 
-    def __init__(self, tmx: TiledMap) -> None:
-
+    def __init__(self, tmx: TiledMap, sprite_keeper: SpriteKeeper) -> None:
         self._tmx = tmx
         self._characters: set[Character] = set()
-        self._sprite_keeper = SpriteKeeper()
+        self._sprite_keeper = sprite_keeper
+        self._char_builder = CharacterBuilder(sprite_keeper)
+        self.default_layer = 0
 
-        # The default layers have to exist.
-        assert self.collision_layer is not None
-        assert self.roof_layer is not None
-        assert self.sprite_layer is not None
-        assert self.trigger_layer is not None
+    def set_trigger_zones(self, zones: ZoneList[TriggerZone]) -> None:
+        self._trigger_zones = zones
+
+    def set_collision_zones(self, zones: ZoneList[Zone]) -> None:
+        self._collision_zones = zones
+
+    @property
+    def char_builder(self) -> CharacterBuilder:
+        return self._char_builder
+
+    @property
+    def trigger_zones(self) -> ZoneList[TriggerZone]:
+        return self._trigger_zones
+
+    @property
+    def collision_zones(self) -> ZoneList[Zone]:
+        return self._collision_zones
 
     @property
     def tmx(self) -> TiledMap:
@@ -142,35 +155,13 @@ class AdventureMap:
 
     @property
     def characters(self) -> tuple[Character, ...]:
-        """
-        NB: If the map is attached to a viewer, the sprites of the characters
-        won't be loaded automatically.
-        You can add the sprites manually via the viewer interface.
-        """
         return tuple(self._characters)
-
-    @property
-    def default_layer_index(self) -> int:
-        return self.get_layer_index("sprites")
-
-    @property
-    def collision_layer(self) -> TiledElement:
-        return self.get_layer("collisions")
-
-    @property
-    def roof_layer(self) -> TiledElement:
-        return self.get_layer("roof")
-
-    @property
-    def sprite_layer(self) -> TiledElement:
-        return self.get_layer("sprites")
-
-    @property
-    def trigger_layer(self) -> TiledElement:
-        return self.get_layer("interaction_zones")
 
     def add_characters(self, *characters: Character) -> None:
         self._characters.update(characters)
+
+    def remove_characters(self, *characters: Character) -> None:
+        self._characters.difference_update(characters)
 
     def get_layer(self, name: str) -> TiledElement:
         return self._tmx.get_layer_by_name(name)
@@ -181,32 +172,3 @@ class AdventureMap:
     def update(self, dt: float) -> None:
         for character in self.characters:
             character.update(dt)
-
-    TChar = TypeVar("TChar", bound=Character)
-
-    def spawn_char_call(self, name: str, table: LuaMapTable, x: int | None = None, y: int | None = None, char_type: Type[TChar] = NPC) -> TChar:
-        assert not self.loaded, "Cannot invoke onLoad calls while already loaded."
-
-        char_table = table.characters[name]
-        entity_table = char_table.entity
-
-        atlas = self._sprite_keeper.sprite(
-            entity_table.source, entity_table.alpha)
-        animations = Animation.from_table(table=entity_table, atlas=atlas)
-        movement_speed: float = char_table.movement_speed if char_table.movement_speed is not None else entity_table.movement_speed
-        position = char_table.position if x is None or y is None else {
-            "x": x, "y": y}
-
-        entity = MovingEntity(animations=animations,
-                              movement_speed=movement_speed,
-                              state=char_table.state,
-                              face_direction=entity_table.face_direction,
-                              frame=entity_table.frame,
-                              position=position,
-                              )
-
-        trigger = char_table.trigger
-        char = char_type(name=name, entity=entity, trigger=trigger)
-        char.load_controllers(char_table)
-        self.add_characters(char)
-        return char

@@ -1,12 +1,9 @@
 .venv/
 **/__pycache__
-mypy.ini
-TODO.md
+
 res/
 
+log.txt
+mypy.ini
 
-
-# Ignore WIP files.
-src/game/item.py
-src/game/rule.py
-src/adventure/actions.lua
+TODO.md

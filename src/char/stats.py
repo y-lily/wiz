@@ -4,15 +4,27 @@ from abc import ABC, abstractmethod
 from contextlib import suppress
 from decimal import Decimal
 from enum import Enum
-from typing import (Any, ClassVar, Iterable, Iterator, Literal, Mapping, Protocol, Type,
-                    TypeAlias, TypeVar, cast, get_args, runtime_checkable)
+from typing import (
+    Any,
+    ClassVar,
+    Iterator,
+    Literal,
+    Mapping,
+    Protocol,
+    Type,
+    TypeAlias,
+    TypeVar,
+    cast,
+    get_args,
+    runtime_checkable,
+)
 
 from typing_extensions import override
 
 from lib.assert_never import assert_never
 from lib.decimal_tools import DecimalRange, SupportsDecimal, roll_decimal
 from lib.sentinel import Sentinel
-from src.game.xp import ExponentialLevelSystem
+from src.char.xp import ExponentialLevelSystem
 
 
 @runtime_checkable

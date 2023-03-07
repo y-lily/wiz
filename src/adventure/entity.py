@@ -2,18 +2,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Sequence
 
-import pygame
+import pygame as pg
+from pygame.event import Event
 from pygame.rect import Rect
 from pygame.sprite import Sprite
 from pygame.surface import Surface
 from typing_extensions import override
 
-from .animation import Animation
-from .lua_defs import LuaPositionTable
-from .shared import Direction
-
 if TYPE_CHECKING:
     from .adventure_map import TriggerZone
+
+from ..sprites import Animation
+from .blueprint import PositionBlueprint
+from .shared import Direction
+
 COLLISION_BOX_WIDTH_RATIO = 0.25
 COLLISION_BOX_HEIGHT_RATIO = 0.25
 
@@ -23,7 +25,7 @@ class Entity(Sprite):
     def __init__(self,
                  *args: object,
                  image: Surface,
-                 position: Optional[LuaPositionTable] = None,
+                 position: Optional[PositionBlueprint] = None,
                  **kwargs: object,
                  ) -> None:
 
@@ -33,6 +35,10 @@ class Entity(Sprite):
         self._position: list[float] = [
             position["x"], position["y"]] if position is not None else list(self.rect.topleft)
         self._match_position()
+
+    @property
+    def position(self) -> tuple[int, int]:
+        return tuple(self._position)
 
     def set_position(self, x: int, y: int) -> None:
         self._position = [x, y]
@@ -57,7 +63,7 @@ class MovingEntity(Entity):
                  face_direction: str | Direction,
                  frame: int = 0,
                  image: Optional[Surface] = None,
-                 position: Optional[LuaPositionTable] = None,
+                 position: Optional[PositionBlueprint] = None,
                  **kwargs: object,
                  ) -> None:
 
@@ -73,7 +79,7 @@ class MovingEntity(Entity):
                 self._default_image = next(
                     animation for animation in animations.values())[self._face_direction][frame]
 
-        self.mask = pygame.mask.from_surface(self._default_image)
+        self.mask = pg.mask.from_surface(self._default_image)
         width, height = self.mask.get_size()
         self._collision_box = Rect(0,
                                    0,
@@ -94,11 +100,11 @@ class MovingEntity(Entity):
 
         self._active_zones: set[TriggerZone] = set()
 
-    @ property
+    @property
     def animations(self) -> dict[str, Animation]:
         return self._animations
 
-    @ property
+    @property
     def active_zones(self) -> set[TriggerZone]:
         return self._active_zones
 
@@ -106,19 +112,19 @@ class MovingEntity(Entity):
     def collision_box(self) -> Rect:
         return self._collision_box
 
-    @ property
+    @property
     def velocity(self) -> list[float]:
         return self._velocity
 
-    @ property
+    @property
     def face_direction(self) -> Direction:
         return self._face_direction
 
-    @ face_direction.setter
+    @face_direction.setter
     def face_direction(self, new: str | Direction) -> None:
         self._face_direction = Direction(new)
 
-    @ property
+    @property
     def movement_speed(self) -> float:
         return self._movement_speed
 
@@ -138,7 +144,7 @@ class MovingEntity(Entity):
         self._position[1] += self._velocity[1] * dt
         self._match_position()
 
-    @ override
+    @override
     def _match_position(self) -> None:
         super()._match_position()
         self._collision_box.midbottom = self.rect.midbottom
