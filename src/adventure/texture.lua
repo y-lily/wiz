@@ -7,13 +7,14 @@ local Texture = {}
 ---@param def table
 ---@return table
 function Texture:new(def)
+    -- Required fields.
+    assert(def.size)
+    assert(def.part_size)
     local this = {
-        width = def.width,
-        height = def.height,
+        size = def.size,
+        part_size = def.part_size,
         source = def.source,
         alpha = def.alpha or false,
-        part_width = def.part_width,
-        part_height = def.part_height,
         parts = def.parts or {
             topleft = 0,
             top = 1,
@@ -27,11 +28,6 @@ function Texture:new(def)
         }
     }
 
-    assert(this.width)
-    assert(this.height)
-    assert(this.source)
-    assert(this.part_width)
-    assert(this.part_height)
     setmetatable(this, self)
     return this
 end
