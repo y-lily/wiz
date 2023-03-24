@@ -16,6 +16,10 @@ class SpriteSheet:
 
         self.alpha = alpha
 
+    @property
+    def size(self) -> tuple[int, int]:
+        return self._sheet.get_size()
+
     def extract_whole(self, alpha: bool | None = None, colorkey: Any | None = None) -> Surface:
         rect = self._sheet.get_rect()
         return self.extract_image(rect=rect, alpha=alpha, colorkey=colorkey)
@@ -35,8 +39,7 @@ class SpriteSheet:
         width, height = rect[2:4]
 
         if alpha:
-            # image = Surface((width, height), pg.SRCALPHA).convert_alpha()
-            image = Surface((width, height)).convert_alpha()
+            image = Surface((width, height), pg.SRCALPHA).convert_alpha()
             image.fill((0, 0, 0, 0))
         else:
             image = Surface((width, height)).convert()

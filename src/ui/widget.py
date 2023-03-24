@@ -22,30 +22,40 @@ class WidgetStack(ABC):
 
     def add(self,
             widget: Widget,
-            centered: bool = False,
-            offset: pair = (0.0, 0.0),
+            centered: bool | None = None,
+            offset: pair[int] | None = None,
             ) -> None:
 
         self._widgets.append(widget)
         widget.add_internal(self)
 
-        widget.centered = centered
-        widget.set_offset_base(offset)
+        if centered is not None:
+            widget.centered = centered
+        if offset is not None:
+            widget.set_offset_base(offset)
         widget.scale(self._scale_factor)
 
-        self._needs_reposition = True
+        self.request_refresh()
 
     def remove(self, widget: Widget) -> None:
         self._widgets.remove(widget)
         widget.remove_internal(self)
 
-    def scale(self, factor: pair) -> None:
+    def request_refresh(self) -> None:
+        self._needs_reposition = True
+
+    def scale(self, factor: pair[float]) -> None:
         self._scale_factor = factor
 
         for widget in self._widgets:
             widget.scale(factor)
 
-        self._needs_reposition = True
+        self.request_refresh()
+
+    def shift_scale(self, shift: pair[float]) -> None:
+        scale_factor = tuple_math.add(self._scale_factor,
+                                            shift)
+        self.scale(scale_factor)
 
     def handle_inputs(self) -> None:
         try:
@@ -57,13 +67,24 @@ class WidgetStack(ABC):
 
     @abstractmethod
     def update(self, dt: float) -> None:
+        # NOTE: The order is important here.
+        # Reposition subwidgets first so they can use up-to-date
+        # coordinates to reposition their own subwidgets.
+        if self._needs_reposition:
+            self._reposition()
+
+        self._needs_reposition = False
+
         for widget in self._widgets:
             widget.update(dt)
+
+    @abstractmethod
+    def _reposition(self) -> None:
+        raise NotImplementedError
 
 
 class Widget(WidgetStack):
 
-    centered: bool = False
     _parent: WidgetStack
 
     def __init__(self,
@@ -78,9 +99,24 @@ class Widget(WidgetStack):
 
         self._trigger = trigger
         self._offset_base = (0.0, 0.0)
+        self._centered = False
+
+    @property
+    def centered(self) -> bool:
+        return self._centered
+    
+    @centered.setter
+    def centered(self, new_value: bool) -> None:
+        self._centered = new_value
+        self.request_refresh()
 
     @override
-    def scale(self, factor: pair) -> None:
+    def request_refresh(self) -> None:
+        super().request_refresh()
+        self._parent.request_refresh()
+
+    @override
+    def scale(self, factor: pair[float]) -> None:
         super().scale(factor)
 
         for sprite in self._spritegroup:
@@ -92,33 +128,38 @@ class Widget(WidgetStack):
 
         self._spritegroup.update(dt)
 
-        if self._needs_reposition:
-            self._reposition()
-
-        self._needs_reposition = False
-
     def draw(self, surface: Surface) -> None:
         self._spritegroup.draw(surface)
 
         for widget in self._widgets:
             widget.draw(surface)
 
-    def calculate_offset(self) -> pair:
+    def calculate_offset(self) -> pair[float]:
         return tuple_math.mult(self._offset_base,
                                    self._scale_factor)
 
-    def set_offset_base(self, new_base: pair) -> None:
+    def set_offset_base(self, new_base: pair[float]) -> None:
         self._offset_base = new_base
+        self.request_refresh()
 
-    def center_at(self, position: pair) -> None:
+    def center_at(self, position: pair[int]) -> None:
         self._background.center_at(position)
         self._needs_reposition = True
 
-    def position_at(self, position: pair) -> None:
+    def position_at(self, position: pair[int]) -> None:
         self._background.position_at(position)
         self._needs_reposition = True
 
-    def get_size(self) -> pair:
+    def move(self, shift: pair[int]) -> None:
+        position = tuple_math.add(self._background.rect.topleft,
+                                  shift)
+        self.position_at(position)
+
+    def shift_offset_base(self, shift: pair[int]) -> None:
+        self._offset_base = tuple_math.add(self._offset_base, shift)
+        self.request_refresh()
+
+    def get_size(self) -> pair[int]:
         return self._background.rect.size
 
     def add_internal(self, parent: WidgetStack) -> None:
@@ -143,6 +184,7 @@ class Widget(WidgetStack):
 
         parent.remove(self)
 
+    @override
     def _reposition(self) -> None:
         rect = self._background.rect
         center = rect.center
@@ -171,11 +213,6 @@ class UI(WidgetStack):
     @override
     def update(self, dt: float) -> None:
         super().update(dt)
-
-        if self._needs_reposition:
-            self._reposition()
-
-        self._needs_reposition = False
 
     def draw(self) -> None:
         for widget in self._widgets:
@@ -226,20 +263,20 @@ class WidgetSprite(Sprite):
         self._refresher = new_image.copy()
         self._is_dirty = True
 
-    def calculate_offset(self) -> pair:
+    def calculate_offset(self) -> pair[float]:
         return tuple_math.mult(self._offset_base,
                                    self._scale_factor)
 
-    def set_offset_base(self, new_base: pair) -> None:
+    def set_offset_base(self, new_base: pair[float]) -> None:
         self._offset_base = new_base
 
-    def center_at(self, position: pair) -> None:
+    def center_at(self, position: pair[float]) -> None:
         self.rect.center = position
 
-    def position_at(self, position: pair) -> None:
+    def position_at(self, position: pair[float]) -> None:
         self.rect.topleft = position
 
-    def scale(self, factor: pair) -> None:
+    def scale(self, factor: pair[float]) -> None:
         if factor == self._scale_factor:
             return
 

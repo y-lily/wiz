@@ -11,10 +11,16 @@ class SpriteKeeper:
         self._sprites: dict[Path, SpriteSheet] = {}
         self._resource_dir = Path(resource_dir)
 
-    def sprite(self, relative_path: str, alpha: bool) -> SpriteSheet:
+    def sprite(self, relative_path: str, alpha: bool | None = None) -> SpriteSheet:
         path = self._resource_dir / relative_path
         try:
             # Don't create a new spritesheet if it's already present.
-            return self._sprites[path]
+            sprite = self._sprites[path]
+            if alpha is not None:
+                sprite.alpha = alpha
         except KeyError:
-            return self._sprites.setdefault(path, SpriteSheet(path, alpha))
+            # NOTE: The default alpha is true so we can have access to the transparent version if we have to. 
+            sprite = self._sprites.setdefault(path, SpriteSheet(path, alpha=True))
+
+        return sprite
+    
