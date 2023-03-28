@@ -17,6 +17,7 @@ from src.adventure import (
 )
 from src.sprites.sprite_keeper import SpriteKeeper
 from src.ui import UI, WidgetLoader, tuple_math
+from src.ui.shared import pair
 
 
 class CollisionController:
@@ -90,21 +91,19 @@ class Game:
     ZOOM_STEP = 0.25
 
     def __init__(self,
-                 screen_size: tuple[int, int],
+                 screen_size: pair[int],
                  map_loader: MapLoader,
                  sprite_keeper: SpriteKeeper,
                  ) -> None:
 
         self.state = "finished"
-
         screen = _create_screen(screen_size)
-        # Used to calculate the scale value after screen resize.
-        self._unscaled_screen_size = screen_size
+        self._last_screen_size = screen.get_size()
 
         self._viewer = MapViewer(screen=screen)
         self._map_loader = map_loader
         self._char_loader = CharacterLoader(sprite_keeper)
-        self._ui = UI(screen=screen)
+        self._ui = UI(screen)
         self._widget_loader = WidgetLoader(
             self._ui, sprite_keeper)
 
@@ -177,14 +176,15 @@ class Game:
             self.draw()
             pg.display.update()
 
-    def set_screen(self, screen_size: tuple[int, int]) -> None:
+    def set_screen(self, screen_size: pair[int]) -> None:
+        shift = tuple_math.div(screen_size,
+                               self._last_screen_size)
+        shift = tuple_math.sub(shift, (1, 1))
         screen = _create_screen(screen_size)
         self._viewer.set_screen(screen)
         self._ui.set_screen(screen)
-
-        scale_factor = tuple_math.div(screen_size,
-                                         self._unscaled_screen_size)
-        self._ui.scale(scale_factor)
+        self._ui.shift_scale(shift)
+        self._last_screen_size = screen_size
 
     def _load_controllers(self) -> None:
         self._viewer.set_map(new_map=self.current_map)
@@ -213,6 +213,6 @@ class Game:
                 self.trigger_controller.invoke_use()
 
 
-def _create_screen(size: tuple[int, int]) -> Surface:
+def _create_screen(size: pair[int]) -> Surface:
     screen = pg.display.set_mode(size, pg.RESIZABLE)
     return screen

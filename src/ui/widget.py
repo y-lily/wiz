@@ -88,13 +88,13 @@ class Widget(WidgetStack):
     _parent: WidgetStack
 
     def __init__(self,
-                 bg_texture: Surface,
+                 bg_surface: Surface,
                  trigger: WidgetTrigger,
                  ) -> None:
 
         super().__init__()
         self._spritegroup = OrderedUpdates()
-        self._background = WidgetSprite(bg_texture)
+        self._background = WidgetSprite(bg_surface)
         self._spritegroup.add(self._background)
 
         self._trigger = trigger

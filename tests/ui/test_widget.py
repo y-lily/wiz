@@ -1,8 +1,9 @@
 import pathlib
 from typing import Any, ClassVar
 
+import pygame as pg
 import pytest
-from mock_app import MockTrigger, create_screen
+from mock_app import MockApp, MockTrigger, create_screen
 from pygame.surface import Surface
 from pytest_lazyfixture import lazy_fixture
 
@@ -41,16 +42,7 @@ class TestWidget:
 
     @pytest.fixture
     def trigger(self) -> MockTrigger:
-        def onUse(trigger: MockTrigger, widget: Widget) -> None:
-            print(f"{type(widget)} ({id(widget)}) called onUse.")
-
-        def onSend(trigger: MockTrigger, widget: Widget, data: Any) -> None:
-            print(f"{type(widget)} ({id(widget)}) called onSend with data [{data}].")
-        
-        def onKill(trigger: MockTrigger, widget: Widget) -> None:
-            print(f"{type(widget)} ({id(widget)}) called onKill.")
-        
-        return MockTrigger(on_kill=onKill, on_send=onSend, on_use=onUse)
+        return MockTrigger()
     
     @pytest.fixture
     def small_widget(self, small_transparent_panel: Panel, trigger: MockTrigger) -> Widget:
@@ -311,3 +303,17 @@ class TestWidget:
 
         position_after = target._background.rect.topleft
         assert position_before == position_after
+
+
+if __name__ == "__main__":
+    pg.init()
+    screen = create_screen((1280, 720))
+    ui = UI(screen)
+    keeper = SpriteKeeper(pathlib.Path(__file__).parent)
+    panel_builder = PanelBuilder(keeper, "panel_32.png")
+    panel = panel_builder.build_panel((640, 480), alpha=True)
+    widget = Widget(panel, MockTrigger())
+    ui.add(widget, centered=True)
+
+    app = MockApp(screen, ui)
+    app.run()

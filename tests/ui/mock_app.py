@@ -5,7 +5,7 @@ from typing import Any, Callable
 import pygame as pg
 from pygame.surface import Surface
 
-from src.ui import Widget, tuple_math
+from src.ui import UI, Widget, tuple_math
 from src.ui.shared import pair
 
 
@@ -43,14 +43,12 @@ class MockApp:
 
     def __init__(self,
                  screen: Surface,
-                 *widgets: Widget,
-                 timer: float = 10,
+                 ui: UI,
                 ) -> None:
         
         self._screen = screen
-        self._DEFAULT_SCREEN_SIZE = screen.get_size()
-        self._widgets = [*widgets]
-        self._time_left = timer
+        self._last_screen_size = screen.get_size()
+        self._ui = ui
 
     def run(self) -> None:
         clock = pg.time.Clock()
@@ -58,11 +56,6 @@ class MockApp:
 
         while self.state == "running":
             dt = clock.tick() / 1000.0
-            self._time_left -= dt
-
-            if self._time_left <= 0:
-                self.state = "finished"
-                return
 
             self._screen.fill(self._DEFAULT_BG_COLOR)
             self.update(dt)
@@ -71,20 +64,13 @@ class MockApp:
             pg.display.update()
 
     def update(self, dt: float) -> None:
-        for widget in self._widgets:
-            widget.update(dt)
+        self._ui.update(dt)
 
     def draw(self) -> None:
-        for widget in self._widgets:
-            widget.draw(self._screen)
+        self._ui.draw()
 
     def handle_events(self) -> None:
-        try:
-            top = self._widgets[-1]
-        except IndexError:
-            pass
-        else:
-            top.handle_inputs()
+        self._ui.handle_inputs()
 
         for event in pg.event.get():
             if any([event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE,
@@ -94,8 +80,11 @@ class MockApp:
                 self.set_screen((event.w, event.h))
 
     def set_screen(self, size: pair[int]) -> None:
-        self._screen = create_screen(size)
-        scale_factor = tuple_math.div(size, self._DEFAULT_SCREEN_SIZE)
+        shift = tuple_math.div(size, self._last_screen_size)
+        shift = tuple_math.sub(shift, (1, 1))
+        
+        screen = create_screen(size)
+        self._ui.set_screen(screen)
+        self._ui.shift_scale(shift)
 
-        for widget in self._widgets:
-            widget.scale(scale_factor)
+        self._last_screen_size = size
