@@ -1,44 +1,54 @@
 package.path = package.path .. ";./res/?.lua;./?.lua;./wiz/res/?.lua"
 
----@class Entity
-local Entity = {}
-
 local DEFAULT_FRAMERATE = 30
 
+---@class Entity
+---@field source string
+---@field alpha boolean
+---@field framewidth integer
+---@field frameheight integer
+---@field flip string
+---@field face_direction string
+---@field framerate integer
+---@field frame integer
+---@field movement_speed integer
+---@field animations table
+local Entity = {}
 
----@param def table
----@return table
+---@class entity_def
+---@field source string
+---@field alpha boolean
+---@field framewidth integer
+---@field frameheight integer
+---@field flip string
+---@field face_direction string
+---@field framerate integer
+---@field frame integer
+---@field movement_speed integer
+---@field animations table
+
+
+---@type fun(self: Entity, def: entity_def): Entity
 function Entity:new(def)
+    -- Required fields.
+    assert(def.source)
+    assert(def.framewidth)
+    assert(def.frameheight)
+    assert(def.movement_speed)
+    assert(def.animations)
 
     local this = {
-        ---@type string
         source = def.source,
-        ---@type boolean
         alpha = def.alpha or true,
-        ---@type integer
         framewidth = def.framewidth,
-        ---@type integer
         frameheight = def.frameheight,
-        ---@type string
         flip = def.flip or "right-left",
-        ---@type integer
         framerate = def.framerate or DEFAULT_FRAMERATE,
-        ---@type string
         face_direction = def.face_direction or "down",
-        ---@type integer
         frame = def.frame or 0,
-        ---@type integer
         movement_speed = def.movement_speed,
-        ---@type table
         animations = def.animations,
     }
-
-    -- Required fields.
-    assert(this.source)
-    assert(this.framewidth)
-    assert(this.frameheight)
-    assert(this.movement_speed)
-    assert(this.animations)
 
     setmetatable(this, self)
     return this

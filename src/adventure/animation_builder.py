@@ -1,8 +1,9 @@
+from typing import assert_never
+
 import pygame as pg
-from pygame.surface import Surface
+from pygame import Surface
 
 from ..sprites import Animation, SpriteKeeper
-from . import shared
 from .blueprint import EntityBlueprint
 from .shared import Direction
 
@@ -35,7 +36,7 @@ class AnimationBuilder:
             elif entity_def.flip is None:
                 pass
             else:
-                shared.assert_never(entity_def.flip)
+                assert_never(entity_def.flip)
 
             animations[anim] = Animation(frames=frames,
                                          frame_rate=framerate,

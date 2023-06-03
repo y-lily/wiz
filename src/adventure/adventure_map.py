@@ -4,27 +4,20 @@ from typing import (
     Any,
     Iterable,
     MutableSequence,
-    Optional,
+    Self,
     SupportsIndex,
     TypeVar,
     overload,
 )
 
-from pygame.event import Event
-from pygame.rect import Rect
-from pygame.sprite import Sprite
+from pygame import Rect
 from pytmx import TiledElement, TiledMap
 
 from ..sprites import SpriteKeeper
 from .blueprint import AdventureMapTrigger
 from .character import Character
 from .character_loader import CharacterBuilder
-from .entity import MovingEntity
-
-try:
-    from typing import Self  # type: ignore [attr-defined]
-except ImportError:
-    from typing_extensions import Self
+from .entity import Entity, MovingEntity
 
 
 class Zone:
@@ -53,7 +46,7 @@ T = TypeVar("T", bound=Zone)
 
 class ZoneList(MutableSequence[T]):
     """
-    Provides a convenient interface to detect sprite's collisions.
+    Provides a convenient interface to detect collisions.
     """
 
     def __init__(self, zones: list[T] | None = None) -> None:
@@ -62,9 +55,9 @@ class ZoneList(MutableSequence[T]):
     @overload
     def __getitem__(self, i: SupportsIndex, /) -> T: ...
     @overload
-    def __getitem__(self, s: slice, /) -> Self[T]: ...
+    def __getitem__(self, s: slice, /) -> Self: ...
 
-    def __getitem__(self, it: SupportsIndex | slice, /) -> T | Self[T]:
+    def __getitem__(self, it: SupportsIndex | slice, /) -> T | Self:
         if isinstance(it, SupportsIndex):
             return self._zones[it]
         return type(self)(self._zones[it])
@@ -91,31 +84,19 @@ class ZoneList(MutableSequence[T]):
         # NOTE: Consider storing rects and updating them on get/set invocations.
         return [zone.rect for zone in self._zones]
 
-    def collides_sprite(self, sprite: Sprite) -> bool:
-        if isinstance(sprite, MovingEntity):
-            return sprite.find_collision(self.rects) > -1
+    def collides(self, entity: Entity) -> bool:
+        if isinstance(entity, MovingEntity):
+            return entity.find_collision(self.rects) > -1
         else:
-            assert sprite.rect is not None
-            return sprite.rect.collidelist(self.rects) > -1
+            assert entity.rect is not None
+            return entity.rect.collidelist(self.rects) > -1
 
-    def get_colliding_zone(self, sprite: Sprite) -> Optional[T]:
-        if isinstance(sprite, MovingEntity):
-            collision_index = sprite.find_collision(self.rects)
+    def get_colliding_zones(self, entity: Entity) -> Self:
+        if isinstance(entity, MovingEntity):
+            collisions = entity.find_all_collisions(self.rects)
         else:
-            assert sprite.rect is not None
-            collision_index = sprite.rect.collidelist(self.rects)
-
-        if collision_index < 0:
-            return None
-
-        return self._zones[collision_index]
-
-    def get_all_colliding_zones(self, sprite: Sprite) -> Self[T]:
-        if isinstance(sprite, MovingEntity):
-            collisions = sprite.find_all_collisions(self.rects)
-        else:
-            assert sprite.rect is not None
-            collisions = sprite.rect.collidelistall(self.rects)
+            assert entity.rect is not None
+            collisions = entity.rect.collidelistall(self.rects)
 
         return type(self)([self._zones[i] for i in collisions])
 

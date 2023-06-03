@@ -1,12 +1,19 @@
 package.path = package.path .. ";./res/?.lua;./?.lua;./wiz/res/?.lua"
 
 ---@class Trigger
+---@field onEnter function<any, any>
+---@field onExit function<any, any>
+---@field onUse function<any, any>
 local Trigger = {}
+
+---@class trigger_def
+---@field onEnter function<any, any>
+---@field onExit function<any, any>
+---@field onUse function<any, any>
 
 local no_op = function() end
 
----@param def table
----@return table
+---@type fun(self: Trigger, def: trigger_def): Trigger
 function Trigger:new(def)
     local this = {
         onEnter = def.onEnter or no_op,

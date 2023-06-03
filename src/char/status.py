@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Final, Literal, TypeAlias, cast, get_args
-
-from lib.assert_never import assert_never
+from typing import Final, Literal, TypeAlias, assert_never, cast, get_args
 
 
 class SourceMark(Enum):

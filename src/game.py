@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pygame as pg
 from lupa import LuaRuntime
-from pygame.surface import Surface
+from pygame import Surface
 
 from src.adventure import (
     AdventureMap,
@@ -15,9 +15,8 @@ from src.adventure import (
     MapViewer,
     keybind,
 )
-from src.sprites.sprite_keeper import SpriteKeeper
-from src.ui import UI, WidgetLoader, tuple_math
-from src.ui.shared import pair
+from src.sprites import SpriteKeeper
+from src.ui import UI, WidgetLoader, pair, tuple_math
 
 
 class CollisionController:
@@ -33,7 +32,7 @@ class CollisionController:
             self._handle_collision(character, dt)
 
     def _handle_collision(self, character: Character, dt: float) -> None:
-        if self._map.collision_zones.collides_sprite(character.entity):
+        if self._map.collision_zones.collides(character.entity):
             character.movement_controller.process_collision(dt)
 
 
@@ -72,7 +71,7 @@ class TriggerController:
 
     def _handle_triggers(self, character: Character, dt: float) -> None:
         old = character.entity.active_zones
-        new = set(self._map.trigger_zones.get_all_colliding_zones(
+        new = set(self._map.trigger_zones.get_colliding_zones(
             character.entity))
 
         just_left = old.difference(new)
@@ -98,7 +97,7 @@ class Game:
 
         self.state = "finished"
         screen = _create_screen(screen_size)
-        self._last_screen_size = screen.get_size()
+        self._base_screen_size = screen.get_size()
 
         self._viewer = MapViewer(screen=screen)
         self._map_loader = map_loader
@@ -177,14 +176,12 @@ class Game:
             pg.display.update()
 
     def set_screen(self, screen_size: pair[int]) -> None:
-        shift = tuple_math.div(screen_size,
-                               self._last_screen_size)
-        shift = tuple_math.sub(shift, (1, 1))
+        factor = tuple_math.div(screen_size,
+                                self._base_screen_size)
         screen = _create_screen(screen_size)
         self._viewer.set_screen(screen)
         self._ui.set_screen(screen)
-        self._ui.shift_scale(shift)
-        self._last_screen_size = screen_size
+        self._ui.scale(factor)
 
     def _load_controllers(self) -> None:
         self._viewer.set_map(new_map=self.current_map)

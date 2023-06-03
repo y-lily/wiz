@@ -1,7 +1,7 @@
 from typing import Sequence
 
 import pygame as pg
-from pygame.surface import Surface
+from pygame import Surface
 
 from ..sprites import SpriteKeeper
 from . import tuple_math

@@ -1,8 +1,8 @@
 from contextlib import suppress
 from typing import TypeVar
 
+from pygame import Surface
 from pygame.event import Event
-from pygame.surface import Surface
 
 T = TypeVar("T", bound=object)
 

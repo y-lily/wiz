@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 import pygame as pg
-from pygame.event import Event
-from pygame.rect import Rect
+from pygame import Rect, Surface
 from pygame.sprite import Sprite
-from pygame.surface import Surface
 from typing_extensions import override
 
 if TYPE_CHECKING:
@@ -25,20 +23,20 @@ class Entity(Sprite):
     def __init__(self,
                  *args: object,
                  image: Surface,
-                 position: Optional[PositionBlueprint] = None,
+                 position: PositionBlueprint | None = None,
                  **kwargs: object,
                  ) -> None:
 
         super().__init__()
         self.image = image
         self.rect: Rect = image.get_rect()
-        self._position: list[float] = [
-            position["x"], position["y"]] if position is not None else list(self.rect.topleft)
+        self._position: list[float] = [position["x"],
+                                       position["y"]] if position is not None else list(self.rect.topleft)
         self._match_position()
 
     @property
-    def position(self) -> tuple[int, int]:
-        return tuple(self._position)
+    def position(self) -> tuple[float, float]:
+        return (self._position[0], self._position[1])
 
     def set_position(self, x: int, y: int) -> None:
         self._position = [x, y]
@@ -62,8 +60,8 @@ class MovingEntity(Entity):
                  state: str = "initial",
                  face_direction: str | Direction,
                  frame: int = 0,
-                 image: Optional[Surface] = None,
-                 position: Optional[PositionBlueprint] = None,
+                 image: Surface | None = None,
+                 position: PositionBlueprint | None = None,
                  **kwargs: object,
                  ) -> None:
 

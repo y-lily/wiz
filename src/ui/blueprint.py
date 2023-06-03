@@ -1,10 +1,12 @@
 """Representation of config APIs."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Mapping
+
+from .shared import pair
 
 if TYPE_CHECKING:
-    from .widget import Widget
+    from .widget import WidgetTrigger
 
 
 class Blueprint(Mapping[str, object]):
@@ -12,18 +14,10 @@ class Blueprint(Mapping[str, object]):
     ...
 
 
-class WidgetTrigger(Blueprint):
-
-    def onKill(self, widget: 'Widget') -> None: ...
-    def onSend(self, widget: 'Widget', data_sent: Any) -> None: ...
-    def onUse(self, widget: 'Widget') -> None: ...
-
-
 class WidgetBlueprint(Blueprint):
 
-    texture: TextureBlueprint
+    bg: PanelBlueprint
     trigger: WidgetTrigger
-
 
 
 class TextboxBlueprint(WidgetBlueprint):
@@ -31,26 +25,45 @@ class TextboxBlueprint(WidgetBlueprint):
     text: str
     font: FontBlueprint
     editable: bool
-    killable: bool
+    closeable: bool
 
 
-class ImageboxBlueprint(WidgetBlueprint):
+class DialogueBlueprint(TextboxBlueprint):
 
-    image: AtlasBlueprint
+    portrait: AtlasBlueprint
+    header: str
+    spacing: Size
 
 
-class SignedImageBlueprint(WidgetBlueprint):
+class SelectorBlueprint(WidgetBlueprint):
+
+    data: Mapping[str, SelectionBlueprint]
+    columns: int
+    spacing: Size
+    font: FontBlueprint
+    selection_size: Size
+    closeable: bool
+
+
+class SelectionBlueprint(Blueprint):
 
     image: AtlasBlueprint
     text: str
-    font: FontBlueprint
-    width_spacing: int
+    header: str
+    item: ItemBlueprint
+
+
+class ItemBlueprint(Blueprint):
+
+    # TODO
+    identifier: int
+    obj: object = None
 
 
 class FontBlueprint(Blueprint):
 
     name: str
-    size: float
+    size: int
     color: str
 
 
@@ -60,13 +73,12 @@ class AtlasBlueprint(Blueprint):
     alpha: bool
 
 
-class TextureBlueprint(Blueprint):
+class PanelBlueprint(Blueprint):
 
     size: Size
     part_size: Size
     source: str
     alpha: bool
-    parts: Mapping[str, int]
 
 
 class Size(Blueprint):
@@ -75,5 +87,5 @@ class Size(Blueprint):
     y: int
 
 
-def size_to_tuple(size: Size) -> tuple[int, int]:
+def size_to_tuple(size: Size) -> pair[int]:
     return (size.x, size.y)

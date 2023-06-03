@@ -1,15 +1,9 @@
 import pathlib
 from abc import abstractmethod
 from enum import Enum
-from typing import NoReturn, TypeAlias
-
-from pygame.event import Event
+from typing import TypeAlias
 
 Path: TypeAlias = str | pathlib.Path
-
-
-def assert_never(value: NoReturn) -> NoReturn:
-    assert False, f"Unexpected value {value} of type {type(value).__name__}"
 
 
 class Controller:

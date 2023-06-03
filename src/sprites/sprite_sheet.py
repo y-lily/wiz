@@ -2,7 +2,7 @@ from os import PathLike
 from typing import Any
 
 import pygame as pg
-from pygame.surface import Surface
+from pygame import Surface
 
 
 class SpriteSheet:

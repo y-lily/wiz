@@ -1,102 +1,214 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import ClassVar, Iterable, assert_never
 
 import pygame as pg
-from pygame.surface import Surface
+from pygame import Surface
+from pygame.event import Event
+from pygame.freetype import Font, SysFont
+from pygame.sprite import OrderedUpdates
 from typing_extensions import override
 
-from . import keybind
-from .blueprint import WidgetTrigger
+from . import keybind, shared, tuple_math
+from .dialogue import DialogueSprite
+from .observer import ListEvent, ListEventType, ListPublisher, Subscriber
 from .shared import Direction, pair
-from .signed_image import SignedImage
-from .textbox import ScrollData, Scroller
-from .widget import Widget
+from .textbox import create_default_font
+from .widget import Widget, WidgetSprite, WidgetTrigger
 
 
 class Selector(Widget):
 
-    _active_widget: SignedImage | None
-    _render_data: list[_ItemRenderData]
-    _selected_index: int
-    _scroller: Scroller[_ItemRenderData]
-
     def __init__(self,
-                 data_source: list[ItemRepresentation],
-                 bg_texture: Surface,
+                 data_source: ListPublisher[Selection],
+                 bg: Surface,
                  trigger: WidgetTrigger,
-                 cell_size: pair,
+                 padding: tuple[int, int, int, int],
                  columns: int = 1,
-                 border_size: pair = (0, 0),
-                 spacing: pair = (4, 4),
-                 killable: bool = True,
+                 spacing: pair[int] = (4, 4),
+                 font: Font | None = None,
+                 selection_size: pair[int] = (0, 0),
+                 closeable: bool = True,
                  ) -> None:
 
-        super().__init__(bg_texture, trigger)
+        super().__init__(bg, trigger)
 
-        self._cell_size = cell_size
-        self._columns = columns
-        self._border_size = border_size
-        self._spacing = spacing
+        self._data_source = data_source
+        self._closeable = closeable
 
-        self.set_data(data_source)
+        surf_size = shared.calculate_subsurface_size(bg, padding)
+        self._selection_sprite = SelectionSprite(surf_size,
+                                                 data_source,
+                                                 font,
+                                                 columns,
+                                                 spacing,
+                                                 selection_size)
+        self._selection_sprite.set_offset_base(padding[:2])
+        self._sprites.add(self._selection_sprite)
+        data_source.add_subscriber(self._selection_sprite)
 
-        self._killable = killable
+        self._scroll_mode = True
 
     @override
     def handle_inputs(self) -> None:
-        events = pg.event.get(eventtype=pg.KEYDOWN)
+        super().handle_inputs()
 
-        for event in events:
-            key = event.key
+        for event in pg.event.get(eventtype=(pg.KEYDOWN)):
+            self._handle_in_scroll_mode(
+                event) if self._scroll_mode else self._handle_in_select_mode(event)
 
-            if key in keybind.ESCAPE:
-                self.kill()
-                return
+    def get_selected(self) -> Selection:
+        return self._selection_sprite.get_selected()
 
-            elif key in keybind.USE:
-                self._swap_active_widget()
-                self._trigger.onUse(self)
+    def _handle_in_scroll_mode(self, event: Event) -> None:
+        assert self._scroll_mode
 
-            elif key in keybind.SEND:
-                self._trigger.onSend(self, self.get_selected())
+        if (key := event.key) in keybind.ESCAPE:
+            self.kill()
+            return
+        elif key in keybind.USE:
+            self._scroll_mode = False
+            self._trigger.onUse(self)
+        elif key in keybind.SEND:
+            self._trigger.onSend(self, self.get_selected().item)
+        elif (direction := keybind.key_to_direction(key)) is not None:
+            self._selection_sprite.scroll_selection(direction)
 
-            elif all([(direction := keybind.key_to_direction(key)) is not None,
-                     self._active_widget is None]):
-                self.scroll_selection(direction)
-                if not self._scroller.is_visible(self.get_selected()):
-                    self.scroll(direction)
+    def _handle_in_select_mode(self, event: Event) -> None:
+        assert not self._scroll_mode
 
-        if self._active_widget is not None:
-            for event in events:
-                pg.event.post(event)
-                self._active_widget.handle_inputs()
+        if (key := event.key) in keybind.ESCAPE:
+            self._scroll_mode = True
+        elif (direction := keybind.key_to_direction(key)) is not None:
+            self._selection_sprite.get_selected_sprite().scroll(direction)
 
-    def set_data(self, data_source: list[ItemRepresentation]) -> None:
-        for widget in self._widgets:
-            widget.kill()
 
-        assert len(self._widgets) == 0
+class SelectionSprite(WidgetSprite, Subscriber):
 
+    _scroll_step: pair[int]
+
+    def __init__(self,
+                 size: pair[int],
+                 data_source: ListPublisher[Selection],
+                 font: Font | None = None,
+                 columns: int = 1,
+                 spacing: pair[int] = (4, 4),
+                 selection_size: pair[int] = (0, 0),
+                 ) -> None:
+
+        image = shared.build_transparent_surface(size)
+        super().__init__(image)
+        self._data_source = data_source
+        data_source.add_subscriber(self)
+        self._columns = columns
+        self._font = font if font is not None else create_default_font()
+        self._font.origin = True
+
+        assert isinstance(self._font.size, float)
+        self._font_size_base = self._font.size
+        self._display_position = (0, 0)
         self._selected_index = 0
-        self._active_widget = None
+        self._wrapper = SelectionWrapper(columns, spacing, self._font)
+        self._selection_size_base = selection_size
 
-        self._render_data = self._wrap_data(data_source)
-        # TODO: Visible area should be the inner rect.
-        self._scroller = Scroller(
-            self._render_data, self._background.rect.size, self._cell_size)
+        # TODO: Choose a method to set the scroll step up.
+        self._scroll_step = (10, 10)
+        self._sprites = OrderedUpdates(self._data_wrap(data_source))
+        self.get_selected_sprite().highlight()
 
-        for item in self._render_data:
-            self.add(item.image)
+    @override
+    def notify(self, event: ListEvent[Selection]) -> None:
+        if (eventtype := event.eventtype) is ListEventType.SETITEM:
+            self._handle_setitem(event)
+        elif eventtype is ListEventType.DELITEM:
+            self._handle_delitem(event)
+        elif eventtype is ListEventType.APPEND:
+            self._handle_append(event)
+        elif eventtype is ListEventType.REMOVE:
+            self._handle_remove(event)
+        elif eventtype is ListEventType.CLEAR:
+            self._handle_clear(event)
+        elif eventtype is ListEventType.EXTEND:
+            self._handle_extend(event)
+        elif eventtype is ListEventType.INSERT:
+            self._handle_insert(event)
+        else:
+            assert_never(eventtype)
 
-    def get_selected(self) -> _ItemRenderData:
-        return self._render_data[self._selected_index]
+    @override
+    def scale(self, factor: pair[float]) -> None:
+        super().scale(factor)
+        self._font.size = self._font_size_base * factor[1]
+
+    @override
+    def update(self, dt: float) -> None:
+        super().update(dt)
+
+        #
+        # self._sprites = self._data_wrap(self._data_source)
+        # for sprite in self._sprites:
+        # sprite.set_offset_base(tuple_math.sub(sprite._offset_base,
+        #                                       self._display_position))
+        # self.get_selected_sprite().highlight()
+
+    @override
+    def _reposition_sprites(self) -> None:
+        display_position = tuple_math.mult(self._display_position,
+                                           self._scale_factor)
+        center = tuple_math.sub(self.rect.center,
+                                display_position)
+
+        for sprite in self._sprites:
+            if sprite.centered:
+                sprite.center_at(tuple_math.intify(center))
+            else:
+                sprite.position_at(tuple_math.intify(
+                    tuple_math.sub(sprite.calculate_offset(),
+                                   display_position)))
+
+    def can_scroll(self, direction: Direction) -> bool:
+        x, y = self._display_position
+
+        if direction is Direction.UP:
+            return y > 0
+        elif direction is Direction.LEFT:
+            return x > 0
+        elif direction is Direction.DOWN:
+            last_sprite = list(self._sprites)[-1]
+            return not self.reaches_side(last_sprite, Direction.DOWN)
+        elif direction is Direction.RIGHT:
+            try:
+                rightmost_sprite = (sprites := list(self._sprites))[
+                    self._columns-1]
+            except IndexError:
+                rightmost_sprite = sprites[-1]
+            return not self.reaches_side(rightmost_sprite, Direction.RIGHT)
+
+        return False
+
+    def get_selected(self) -> Selection:
+        return self._data_source[self._selected_index]
+
+    def get_selected_sprite(self) -> DialogueSprite:
+        return list(self._sprites)[self._selected_index]
 
     def scroll(self, direction: Direction) -> None:
-        if not self._scroller.can_scroll(direction):
+        x, y = self._display_position
+        step_x, step_y = self._scroll_step
+
+        if direction is Direction.UP:
+            y -= step_y
+        elif direction is Direction.LEFT:
+            x -= step_x
+        elif direction is Direction.DOWN:
+            y += step_y
+        elif direction is Direction.RIGHT:
+            x += step_x
+        else:
             return
 
-        self._scroller.scroll(direction)
+        self._display_position = (x, y)
+        self._adjust_position()
 
     def scroll_selection(self, direction: Direction) -> None:
         index = self._selected_index
@@ -104,96 +216,191 @@ class Selector(Widget):
 
         if direction is Direction.UP and index >= columns:
             index -= columns
-        elif direction is Direction.DOWN and index < len(self._render_data) - columns:
-            index += columns
-        elif direction is Direction.LEFT and (index % columns) > 0:
+        elif direction is Direction.LEFT and index % columns > 0:
             index -= 1
-        elif direction is Direction.RIGHT and (index % columns) < columns - 1:
+        elif direction is Direction.DOWN and index + columns < len(self._sprites):
+            index += columns
+        elif all((direction is Direction.RIGHT,
+                  index % columns < columns - 1,
+                  index < len(self._sprites) - 1)):
             index += 1
-
-        self._selected_index = index
-
-    def _swap_active_widget(self) -> None:
-        if self._active_widget is None:
-            self._active_widget = self.get_selected().image
         else:
-            self._active_widget = None
+            return
 
-    def _wrap_data(self, data_source: list[ItemRepresentation]) -> list[_ItemRenderData]:
-        with ItemWrapper(self._border_size, self._spacing, self._columns) as wrapper:
+        self.get_selected_sprite().highlight(False)
+        self._selected_index = index
+        self.get_selected_sprite().highlight(True)
 
-            def assign_data(representation: ItemRepresentation) -> _ItemRenderData:
-                return wrapper.wrap(_ItemRenderData(representation.image, representation.item))
+        while not self.reaches_side(self.get_selected_sprite(), direction) and self.can_scroll(direction):
+            self.scroll(direction)
 
-            wrapped = [assign_data(item) for item in data_source]
+    def reaches_side(self, sprite: WidgetSprite, side: Direction) -> bool:
+        x, y = tuple_math.intify(tuple_math.mult((self._display_position),
+                                                 (self._scale_factor)))
+        offset_x, offset_y = sprite.calculate_offset()
 
-        return wrapped
+        if side is Direction.UP:
+            # return self.rect.top + y <= sprite.rect.top
+            return offset_y >= y
+        elif side is Direction.LEFT:
+            # return self.rect.left + x <= sprite.rect.left
+            return offset_x >= x
+        elif side is Direction.DOWN:
+            return offset_y + sprite.rect.height <= y + self.rect.height
+            # return self.rect.bottom + y >= sprite.rect.bottom
+        elif side is Direction.RIGHT:
+            return offset_x + sprite.rect.width <= x + self.rect.width
+            # return self.rect.right + x >= sprite.rect.right
+        else:
+            raise ValueError(f"Cannot determine side collision for {side}.")
+
+    def _adjust_position(self) -> None:
+        last_child = list(self._sprites)[-1]
+        # NOTE: You probably want to subtract self.rect.size.
+        max_x, max_y = tuple_math.add(last_child.calculate_offset(),
+                                      last_child.rect.size)
+        x, y = self._display_position
+
+        x = int(max(0, min(x, max_x)))
+        y = int(max(0, min(y, max_y)))
+
+        self._display_position = (x, y)
+
+    def update_scroll_step(self) -> None:
+        self._scroll_step = (10, 10)
+
+    def _handle_setitem(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.SETITEM
+
+        if not isinstance((key := event.key), slice):
+            key = slice(key, key+1, 1)
+
+        if not isinstance((value := event.value), Iterable):
+            value = (value,)
+
+        sprites = list(self._sprites)
+        new_sprites = self._data_wrap(value)
+        sprites[key] = new_sprites
+
+        self._sprites.empty()
+        self._sprites.add(sprites)
+
+    def _handle_delitem(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.DELITEM
+
+        sprites = list(self._sprites)
+        del sprites[event.key]
+
+        self._sprites.empty()
+        self._sprites.add(sprites)
+
+    def _handle_append(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.APPEND
+
+        if not isinstance((value := event.value), Iterable):
+            value = (value,)
+
+        new_sprites = self._data_wrap(value)
+        self._sprites.add(new_sprites)
+
+    def _handle_remove(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.REMOVE
+
+        value = event.value
+
+        sprites = [
+            sprite for sprite in self._sprites if not sprite.selection is value]
+
+        self._sprites.empty()
+        self._sprites.add(sprites)
+
+    def _handle_clear(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.CLEAR
+
+        self._sprites.empty()
+
+    def _handle_extend(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.EXTEND
+
+        assert isinstance(event.value, Iterable)
+        new_sprites = self._data_wrap(event.value)
+        self._sprites.add(new_sprites)
+
+    def _handle_insert(self, event: ListEvent[Selection]) -> None:
+        assert event.eventtype is ListEventType.INSERT
+
+        sprites = list(self._sprites)
+        index = event.index
+
+        assert not isinstance(event.value, Iterable)
+        value = (event.value,)
+        new_sprites = self._data_wrap(value)
+        sprites.insert(index, new_sprites[0])
+
+    def _data_wrap(self, data_source: Iterable[Selection]) -> list[DialogueSprite]:
+        selection_size = tuple_math.intify(tuple_math.mult(self._selection_size_base,
+                                                           self._scale_factor))
+        return self._wrapper.get_sprites(data_source, selection_size)
 
 
-class ItemWrapper:
+class Selection:
 
-    def __init__(self, border_size: pair, spacing: pair, columns: int = 1) -> None:
-        self._wrapper = self._Wrapper(border_size, spacing, columns)
-
-    def __enter__(self) -> ItemWrapper._Wrapper:
-        self._wrapper.start()
-        return self._wrapper
-
-    def __exit__(self, *args: object, **kwargs: object) -> None:
-        self._wrapper.stop()
-        del self._wrapper
-
-    class _Wrapper:
-
-        def __init__(self, border_size: pair, spacing: pair, columns: int) -> None:
-            self.border_size = border_size
-            self.spacing = spacing
-            self.columns = columns
-
-        def start(self) -> None:
-            self.x, self.y = self.border_size
-            self.column = 0
-
-        def stop(self) -> None:
-            del self.x, self.y, self.column
-
-        def wrap(self, item_data: _ItemRenderData) -> _ItemRenderData:
-            spacing = self.spacing
-            size = item_data.size
-
-            item_data.offset = self.x, self.y
-
-            self.x += size[0] + spacing[0]
-            self.column += 1
-            if self.column >= self.columns:
-                self.x = self.border_size[0]
-                self.y += size[1] + spacing[1]
-                self.column = 0
-
-            return item_data
+    image: Surface
+    text: str
+    header: str = ""
+    item: object = None
 
 
-@dataclass
-class ItemRepresentation:
+class SelectionWrapper:
 
-    image: SignedImage
-    item: object
+    TEXT_SPACING: ClassVar = 2
+    DIALOGUE_SPACING: ClassVar = (4, 4)
 
+    def __init__(self,
+                 columns: int,
+                 spacing: pair[int],
+                 font: Font,
+                 ) -> None:
 
-@dataclass
-class _ItemRenderData(ScrollData):
+        self._columns = columns
+        self._spacing = spacing
+        self._font = font
 
-    image: SignedImage
-    item: object
+    def get_sprites(self, data_source: Iterable[Selection], base_selection_size: pair[int] = (0, 0)) -> list[DialogueSprite]:
+        def clean(word: str) -> str:
+            return word.rstrip("\n")
 
-    @property
-    def offset(self) -> pair:
-        return self.image.offset_base
+        def get_size(selection: Selection) -> pair[int]:
+            text_area_width = max(self._font.get_rect(
+                clean(word)).width for word in selection.text.split(" "))
+            width = selection.image.get_width() + self.TEXT_SPACING + text_area_width
+            height = selection.image.get_height()
+            return (width, height)
 
-    @offset.setter
-    def offset(self, new_offset: pair) -> None:
-        self.image.set_offset_base(new_offset)
+        items = [(selection, get_size(selection)) for selection in data_source]
+        max_size = tuple_math.max_(
+            *(size for _, size in items), base_selection_size)
+        sprites = []
 
-    @property
-    def size(self) -> pair:
-        return self.image.get_size()
+        x, y = 0, 0
+        column = 0
+
+        for selection, _ in items:
+            sprite = DialogueSprite(max_size,
+                                    selection.image,
+                                    selection.text,
+                                    selection.header,
+                                    self.DIALOGUE_SPACING,
+                                    self._font)
+            sprite.set_offset_base((x, y))
+            x += max_size[0] + self._spacing[0]
+            column += 1
+
+            if column >= self._columns:
+                x = 0
+                y += max_size[1] + self._spacing[1]
+                column = 0
+
+            sprites.append(sprite)
+
+        return sprites

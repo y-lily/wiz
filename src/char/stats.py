@@ -14,6 +14,7 @@ from typing import (
     Type,
     TypeAlias,
     TypeVar,
+    assert_never,
     cast,
     get_args,
     runtime_checkable,
@@ -21,7 +22,6 @@ from typing import (
 
 from typing_extensions import override
 
-from lib.assert_never import assert_never
 from lib.decimal_tools import DecimalRange, SupportsDecimal, roll_decimal
 from lib.sentinel import Sentinel
 from src.char.xp import ExponentialLevelSystem

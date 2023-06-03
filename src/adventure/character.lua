@@ -1,32 +1,42 @@
 package.path = package.path .. ";./res/?.lua;./?.lua;./wiz/res/?.lua"
 
+---@class Trigger
+local Trigger = require "trigger"
+
 ---@class Character
+---@field name string
+---@field entity Entity
+---@field state string
+---@field position _2D
+---@field defined_states table
+---@field trigger Trigger
 local Character = {}
 
----@param def table
----@return table
+---@class char_def
+---@field name string
+---@field entity Entity
+---@field state string
+---@field position _2D
+---@field defined_states table
+---@field trigger Trigger
+
+---@type fun(self: Character, def: char_def): Character
 function Character:new(def)
+    -- Required fields.
+    assert(def.name)
+    assert(def.entity)
+    assert(def.state)
+    assert(def.defined_states)
+    assert(def.position)
 
     local this = {
-        ---@type string
         name = def.name,
-        ---@type Entity
         entity = def.entity,
-        ---@type string
         state = def.state,
-        ---@type table
         defined_states = def.defined_states,
-        ---@type table
         position = def.position,
-        ---@type Trigger
         trigger = def.trigger or Trigger:new({}),
     }
-
-    -- Required fields.
-    assert(this.name)
-    assert(this.entity)
-    assert(this.state)
-    assert(this.defined_states)
 
     setmetatable(this, self)
     return this

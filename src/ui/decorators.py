@@ -34,7 +34,33 @@ class Decorator(Generic[T], object):
         return self._decorated
 
 
-class FadingWidget(Decorator[Widget]):
+class WidgetDecorator(Generic[T], Decorator[T]):
+
+    def __getattr__(self, attribute: str) -> object:
+        if attribute == "kill":
+            return self.kill()
+        return super().__getattr__(attribute)
+
+    def kill(self: Widget | Decorator) -> None:
+        self._trigger.onKill(self)
+
+        for widget in list(self._decorated._widgets):
+            widget.kill()
+
+        self._decorated._widgets = []
+        self._decorated._sprites.empty()
+
+        try:
+            parent = self._decorated._parent
+        except AttributeError:
+            return
+
+        # FIXME!!!
+        # parent.remove(self._decorated)
+        parent.remove(self)
+
+
+class FadingWidget(WidgetDecorator[Widget]):
 
     def __init__(self: Widget | FadingWidget,
                  widget: Widget,
@@ -60,7 +86,7 @@ class FadingWidget(Decorator[Widget]):
         pass
 
 
-class AutoscrollingTextbox(Decorator[Textbox]):
+class AutoscrollingTextbox(WidgetDecorator[Textbox]):
 
     def __init__(self, decorated: Textbox) -> None:
         super().__init__(decorated)
@@ -73,7 +99,7 @@ class AutoscrollingTextbox(Decorator[Textbox]):
             self._text_sprite.scroll(Direction.DOWN)
 
 
-class AnimatedTextbox(Decorator[Textbox]):
+class AnimatedTextbox(WidgetDecorator[Textbox]):
 
     def __init__(self,
                  textbox: Textbox,

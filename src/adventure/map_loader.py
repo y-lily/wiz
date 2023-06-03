@@ -3,7 +3,7 @@ from typing import Callable, Iterable
 
 import pytmx
 from lupa import LuaRuntime
-from pygame.rect import Rect
+from pygame import Rect
 
 from ..sprites import SpriteKeeper
 from .adventure_map import (

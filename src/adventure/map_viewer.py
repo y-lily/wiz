@@ -1,9 +1,8 @@
 from contextlib import suppress
-from typing import Any, Optional, Sequence
+from typing import Any
 
-from pygame.event import Event
+from pygame import Surface
 from pygame.sprite import Sprite
-from pygame.surface import Surface
 from pyscroll import BufferedRenderer, PyscrollGroup
 from pyscroll.data import TiledMapData
 from pytmx import TiledElement, TiledObject
@@ -54,7 +53,7 @@ class MapViewer:
     # def sprites(self) -> list[Sprite]:
     #     return self._group.sprites()
 
-    def add_sprites(self, *sprites: Sprite, layer: Optional[int] = None) -> None:
+    def add_sprites(self, *sprites: Sprite, layer: int | None = None) -> None:
         self._group.add(*sprites, layer=layer)
 
     def remove_sprites(self, *sprites: Sprite) -> None:
@@ -78,7 +77,7 @@ class MapViewer:
 
     def show_layers(self, *layers: str) -> None:
         if not layers:
-            layers = self._hidden_layers.keys()
+            layers = tuple(self._hidden_layers.keys())
 
         for layer in layers:
             sprites = self._hidden_layers[layer]
@@ -123,7 +122,8 @@ class MapViewer:
         self._map.update(dt)
 
     def get_center_offset(self) -> tuple[int, int]:
-        return tuple(self._scroller.get_center_offset())
+        offset = self._scroller.get_center_offset()
+        return (offset[0], offset[1])
 
     def _load_map_sprites(self, new_map: AdventureMap) -> dict[str, list[Entity]]:
         return {layer.name: self._load_layer_sprites(layer) for layer in new_map.tmx.layers}

@@ -1,8 +1,8 @@
 import random
-from decimal import Decimal, DecimalTuple
+from decimal import Decimal
 from typing import TypeAlias
 
-SupportsDecimal: TypeAlias = Decimal | str | int | float | DecimalTuple
+SupportsDecimal: TypeAlias = Decimal | str | float
 
 
 def roll_decimal(minimum: Decimal, maximum: Decimal, digits: int = 2) -> Decimal:
