@@ -2,6 +2,7 @@ from .button import Button
 from .decorators import AutoscrollingTextbox, FadingWidget
 from .dialogue import Dialogue
 from .panel import Panel, PanelBuilder
+from .progress_bar import ProgressBar
 from .selector import Selector
 from .shared import pair
 from .textbox import Textbox
@@ -18,6 +19,7 @@ __all__ = [
     "pair",
     "Panel",
     "PanelBuilder",
+    "ProgressBar",
     "Selector",
     "Textbox",
     "UI",
