@@ -1,10 +1,11 @@
 """Representation of config APIs."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Literal, Mapping, TypedDict
+from typing import TYPE_CHECKING, Callable, Literal, Mapping, TypedDict
 
 if TYPE_CHECKING:
-    from ..game import Game
+    from src.game import Game
+
     from .adventure_map import AdventureMap, Zone
     from .character import Character
 
@@ -19,7 +20,7 @@ class AdventureMapBlueprint(Blueprint):
     tmx: str
     entities: Mapping[str, EntityBlueprint]
     characters: Mapping[str, CharacterBlueprint]
-    entryPoints: Mapping[str, PositionBlueprint]
+    entryPoints: Mapping[str, Position]
 
     onLoad: Mapping[str, Callable[[AdventureMap], None]]
 
@@ -45,7 +46,7 @@ class CharacterBlueprint(Blueprint):
     entity: EntityBlueprint
     state: str
     defined_states: Mapping[int, StateBlueprint]
-    position: PositionBlueprint
+    position: Position
     movement_speed: int | None
     trigger: AdventureMapTrigger
 
@@ -56,7 +57,7 @@ class StateBlueprint(Blueprint):
     name: str
 
 
-class PositionBlueprint(Blueprint):
+class Position(TypedDict):
 
     x: int
     y: int

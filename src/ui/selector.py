@@ -5,14 +5,18 @@ from typing import ClassVar, Iterable, assert_never
 import pygame as pg
 from pygame import Surface
 from pygame.event import Event
-from pygame.freetype import Font, SysFont
+from pygame.freetype import Font
 from pygame.sprite import OrderedUpdates
 from typing_extensions import override
 
-from . import keybind, shared, tuple_math
+# TODO:
+# import keybind, shared, tuple_math
+# from shared import Direction, pair
+from src import keybind, shared, tuple_math
+from src.shared import Direction, pair
+
 from .dialogue import DialogueSprite
 from .observer import ListEvent, ListEventType, ListPublisher, Subscriber
-from .shared import Direction, pair
 from .textbox import create_default_font
 from .widget import Widget, WidgetSprite, WidgetTrigger
 

@@ -1,10 +1,5 @@
 from abc import ABC
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Iterator, Mapping, Type, TypedDict, TypeVar, cast
-
-from lib.decimal_tools import DecimalRange
-from src.char.stats import DamageSource, Modifier, StatBlock
+from typing import Any, Iterator, Mapping, Type, TypeVar, cast
 
 
 class ItemComponent(ABC):
@@ -87,7 +82,7 @@ class ComponentSheet:
         self._blocks.pop(block)
 
 
-# Items should have unique tokens with theCm so you can track the changes they've made within the status bar.
+# Items should have unique tokens with them so you can track the changes they've made within the status bar.
 
 
 # class Animal:

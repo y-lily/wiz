@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import TypeAlias
 
-from ..sprites import SpriteKeeper
+# TODO:
+# from sprites import SpriteKeeper
+from src.sprites import SpriteKeeper
+
 from .blueprint import DialogueBlueprint, SelectorBlueprint, Size, TextboxBlueprint
 from .decorators import AnimatedTextbox, FadingWidget
 from .dialogue import Dialogue

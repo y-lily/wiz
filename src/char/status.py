@@ -261,6 +261,6 @@ class StatusBar:
             expired.append(status) if status.is_expired(
             ) else unique.append(status)
 
-        self._expired.extend(expired)
+        self._expired += expired
         self._common = common
         self._unique = {status.unique_mark: status for status in unique}

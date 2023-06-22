@@ -7,8 +7,12 @@ from mock_app import MockApp, create_screen
 from pygame import Surface
 from pytest_lazyfixture import lazy_fixture
 
-from src.sprites.sprite_keeper import SpriteKeeper
-from src.ui import UI, FadingWidget, Panel, PanelBuilder, Widget, tuple_math
+# TODO:
+# from sprites import SpriteKeeper
+# import tuple_math
+from src import tuple_math
+from src.sprites import SpriteKeeper
+from src.ui import UI, FadingWidget, Panel, PanelBuilder, Widget
 from src.ui.widget import WidgetTrigger
 
 

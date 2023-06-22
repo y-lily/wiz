@@ -1,5 +1,15 @@
 import pygame as pg
 
+# TODO:
+# from shared import Direction
+from src.shared import Direction
+
+BACKSPACE = (pg.K_BACKSPACE,
+             )
+
+TAB = (pg.K_TAB,
+       )
+
 USE = (pg.K_SPACE,
        )
 
@@ -33,3 +43,16 @@ ZOOM_IN = (pg.K_EQUALS,
 SEND = (pg.K_RETURN,
         pg.K_KP_ENTER,
         )
+
+
+def key_to_direction(key: int) -> Direction | None:
+    return next((direction for bind, direction in _KEY_TO_DIRECTION.items() if key in bind),
+                None)
+
+
+_KEY_TO_DIRECTION = {
+    UP: Direction.UP,
+    DOWN: Direction.DOWN,
+    LEFT: Direction.LEFT,
+    RIGHT: Direction.RIGHT,
+}

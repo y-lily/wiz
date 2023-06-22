@@ -6,10 +6,14 @@ from typing import Any, Callable, ClassVar
 import pygame as pg
 from pygame import Rect, Surface
 from pygame.sprite import OrderedUpdates, Sprite
+from transitions import core
 from typing_extensions import override
 
-from . import shared, tuple_math
-from .shared import no_op, pair
+# TODO:
+# import shared, tuple_math
+# from shared import no_op, pair
+from src import shared, tuple_math
+from src.shared import no_op, pair
 
 
 class WidgetStack(ABC):
@@ -155,19 +159,21 @@ class Widget(WidgetStack):
         return tuple_math.mult(self._offset_base,
                                self._scale_factor)
 
-    def center_at(self, position: pair[int]) -> None:
-        self._bg.center_at(position)
+    def center_at(self, pixel: pair[int]) -> None:
+        self._bg.center_at(pixel)
 
         # This method moves the widget directly and is used by
         # its parent. Therefore, request_reposition() should not be
         # called here as it will cause recursion.
         self._reposition()
 
-    def draw(self, surface: Surface) -> None:
-        self._sprites.draw(surface)
+    def draw(self, surface: Surface) -> list[Rect]:
+        rects = list(core.listify(self._sprites.draw(surface)))
 
         for widget in self._widgets:
-            widget.draw(surface)
+            rects += core.listify(widget.draw(surface))
+
+        return rects
 
     def get_size(self) -> pair[int]:
         return self._bg.rect.size
@@ -193,8 +199,8 @@ class Widget(WidgetStack):
                                   step)
         self.position_at(position)
 
-    def position_at(self, position: pair[int]) -> None:
-        self._bg.position_at(position)
+    def position_at(self, pixel: pair[int]) -> None:
+        self._bg.position_at(pixel)
 
         # This method moves the widget directly and is used by
         # its parent. Therefore, request_reposition() should not be
@@ -242,9 +248,13 @@ class UI(WidgetStack):
         for widget in self._widgets:
             reposition(widget)
 
-    def draw(self) -> None:
+    def draw(self) -> list[Rect]:
+        rects: list[Rect] = []
+
         for widget in self._widgets:
-            widget.draw(self._screen)
+            rects += core.listify(widget.draw(self._screen))
+
+        return rects
 
     def set_screen(self, new_screen: Surface) -> None:
         self._screen = new_screen
@@ -290,8 +300,8 @@ class WidgetSprite(Sprite):
         return tuple_math.mult(self._offset_base,
                                self._scale_factor)
 
-    def center_at(self, position: pair[int]) -> None:
-        self.rect.center = position
+    def center_at(self, pixel: pair[int]) -> None:
+        self.rect.center = pixel
 
     def highlight(self,
                   mode_on: bool = True,
@@ -303,8 +313,8 @@ class WidgetSprite(Sprite):
         if color is not None:
             self._highlighter.set_color(color)
 
-    def position_at(self, position: pair[int]) -> None:
-        self.rect.topleft = position
+    def position_at(self, pixel: pair[int]) -> None:
+        self.rect.topleft = pixel
 
     def scale(self, factor: pair[float]) -> None:
         for sprite in self._sprites:

@@ -3,9 +3,13 @@ from typing import assert_never
 import pygame as pg
 from pygame import Surface
 
-from ..sprites import Animation, SpriteKeeper
+# TODO:
+# from shared import Direction
+# from sprites import Animation, SpriteKeeper
+from src.shared import Direction
+from src.sprites import Animation, SpriteKeeper
+
 from .blueprint import EntityBlueprint
-from .shared import Direction
 
 
 class AnimationBuilder:

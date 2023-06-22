@@ -3,6 +3,8 @@ import pathlib
 import pygame as pg
 from mock_app import MockApp, create_screen
 
+# TODO:
+# from sprites import SpriteKeeper
 from src.sprites import SpriteKeeper
 from src.ui import UI, ProgressBar
 from src.ui.panel import PanelBuilder

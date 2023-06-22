@@ -4,34 +4,46 @@ import random
 from abc import abstractmethod
 from enum import Enum
 from functools import partial
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Optional, Type, TypeAlias
+from typing import TYPE_CHECKING, Literal, Mapping, Type, TypeAlias
 
 import pygame as pg
 from bidict import bidict
-from pygame.event import Event
 from transitions import EventData, Machine, State, core
 from typing_extensions import override
 
-from ..sprites import Animation
-from . import keybind
+# TODO:
+# import keybind
+# from shared import Controller, Direction, pair
+# from sprites import Animation
+from src import keybind
+from src.shared import Controller, Direction, pair
+from src.sprites import Animation
+
 from .blueprint import StateBlueprint
 from .entity import MovingEntity
-from .shared import Controller, Direction
 
 UnitVector: TypeAlias = Literal[-1, 0, 1]
+Coordinate: TypeAlias = pair[UnitVector]
 
-CoordDirTranslator: bidict[tuple[UnitVector,
-                                 UnitVector],
-                           str] = bidict({(0, 1): "down",
-                                          (1, 0): "right",
-                                          (0, -1): "up",
-                                          (-1, 0): "left",
-                                          (-1, 1): "downleft",
-                                          (1, -1): "upright",
-                                          (1, 1): "downright",
-                                          (-1, -1): "upleft",
-                                          (0, 0): "",
-                                          })
+_COORD_DIR_TRANSLATOR: bidict[Coordinate,
+                              Direction | None] = bidict({(0, 1): Direction.DOWN,
+                                                          (1, 0): Direction.RIGHT,
+                                                          (0, -1): Direction.UP,
+                                                          (-1, 0): Direction.LEFT,
+                                                          (-1, 1): Direction.DOWNLEFT,
+                                                          (1, -1): Direction.UPRIGHT,
+                                                          (1, 1): Direction.DOWNRIGHT,
+                                                          (-1, -1): Direction.UPLEFT,
+                                                          (0, 0): None,
+                                                          })
+
+
+def coordinate_to_direction(coordinate: Coordinate) -> Direction | None:
+    return _COORD_DIR_TRANSLATOR.get(coordinate, None)
+
+
+def direction_to_coordinate(direction: Direction) -> Coordinate:
+    return _COORD_DIR_TRANSLATOR.inv.get(direction)
 
 
 class AnimationController(Controller):
@@ -64,101 +76,7 @@ class AnimationController(Controller):
         self._last_state = state
 
 
-class MovementState(State):
-
-    def __init__(self, name: str | Enum, machine: MovementController, *args: Any, **kwargs: Any) -> None:
-        self._machine = machine
-        on_enter = kwargs.get("on_enter", None)
-        on_exit = kwargs.get("on_exit", None)
-        super().__init__(name, on_enter, on_exit)
-
-    @abstractmethod
-    def update(self, dt: float) -> None:
-        raise NotImplementedError(type(self))
-
-    @abstractmethod
-    def process_collision(self, dt: float) -> None:
-        raise NotImplementedError(type(self))
-
-
 class MovementController(Machine, Controller):
-
-    transitions: list[list[str | list[str]] | dict[str, str | list[str]]]
-
-    def __init__(self, model: MovingEntity, state_table: Mapping[int, StateBlueprint], initial: str | None = None) -> None:
-        states = list(dict(table) for table in state_table.values())
-        super().__init__(states=states, transitions=self.transitions, initial=initial,
-                         auto_transitions=False, model_attribute="state", send_event=True)
-        self.add_model(model)
-
-    @override
-    def add_model(self, model: list[object] | object, initial: str | Enum | State | None = None) -> None:
-        models = core.listify(model)
-
-        if initial is None:
-            if self.initial is None:
-                raise ValueError(
-                    "No initial state configured for machine, must specify when adding model.")
-            initial = self.initial
-
-        for mod in models:
-            if mod is self.self_literal:
-                for trigger in self.events:
-                    self._add_trigger_to_model(trigger, self)
-
-                for state in self.states.values():
-                    self._add_model_to_state(state, self)
-
-                self._checked_assignment(
-                    self, "trigger", partial(self._get_trigger, self))
-
-                self.set_state(initial, model=self)
-
-                return
-
-            if mod not in self.models:
-                self.set_state(initial, model=mod)
-                self.models.append(mod)
-
-    @override
-    def set_state(self, state: str | Enum | State, model: Optional[object] = None) -> None:
-        """Change model state when own state is changed."""
-        super().set_state(state, model)
-        assert model != self.model
-        super().set_state(state, self.model)
-
-    def process_collision(self, dt: float) -> None:
-        self.get_model_state(self.model).process_collision(dt)
-
-    def update(self, dt: float) -> None:
-        self.get_model_state(self.model).update(dt)
-
-    def _move_model_to_last_stable_ground_event(self, event: EventData) -> None:
-        dt: float = event.kwargs["dt"]
-        self.model.to_last_stable_ground(dt)
-
-    def _set_model_face_direction_event(self, event: EventData) -> None:
-        x: UnitVector = event.kwargs.get("x", 0)
-        y:  UnitVector = event.kwargs.get("y", 0)
-
-        direction = CoordDirTranslator.get((x, y), "")
-
-        if direction == "":
-            return
-
-        self.model.face_direction = Direction(direction)
-
-    def _set_model_unit_vectors_event(self, event: EventData) -> None:
-        x: UnitVector = event.kwargs.get('x', 0)
-        y: UnitVector = event.kwargs.get('y', 0)
-
-        self.model.velocity[0] = x * self.model.movement_speed
-        self.model.velocity[1] = y * self.model.movement_speed
-
-    @override
-    def _create_state(self, name: str, default: Type[MovementState], *args: object, **kwargs: object) -> MovementState:
-        cls = _get_state_cls(name, default)
-        return cls(name=name, machine=self, *args, **kwargs)
 
     if TYPE_CHECKING:
         @property
@@ -166,71 +84,244 @@ class MovementController(Machine, Controller):
         def get_model_state(self, model: object) -> MovementState: ...
         def trigger(self, _: str, **kwargs: object) -> None: ...
 
+    transitions: list[list[str | list[str]] | dict[str, str | list[str]]]
+
+    def __init__(self,
+                 model: MovingEntity,
+                 state_table: Mapping[int, StateBlueprint],
+                 initial: str | Enum | State | None = None,
+                 ) -> None:
+
+        states = list(dict(table) for table in state_table.values())
+
+        # Detect if it's been accidentally renamed.
+        assert hasattr(model, "state")
+        super().__init__(states=states,
+                         transitions=self.transitions,
+                         initial=initial,
+                         auto_transitions=False,
+                         model_attribute="state",
+                         send_event=True,
+                         )
+
+        self.add_model(model)
+
+    @override
+    def add_model(self,
+                  model: list[object] | object,
+                  initial: str | Enum | State | None = None,
+                  ) -> None:
+
+        models = core.listify(model)
+
+        initial = initial if initial is not None else self.initial
+        if initial is None:
+            raise ValueError("No initial state has been configured for the machine, \
+                             must be specified when adding a model.")
+
+        for mod in models:
+            if mod is self.self_literal:
+                for trigger in self.events:
+                    self._add_trigger_to_model(trigger, self)
+                for state in self.states.values():
+                    self._add_model_to_state(state, self)
+                self._checked_assignment(self,
+                                         "trigger",
+                                         partial(self._get_trigger, self))
+                self.set_state(initial, model=self)
+                return
+
+            if mod not in self.models:
+                self.set_state(initial, model=mod)
+                self.models.append(mod)
+
+    @override
+    def set_state(self,
+                  new_state: str | Enum | State,
+                  model: object | None = None,
+                  ) -> None:
+
+        # Ensure the model's state changes on each call.
+        super().set_state(new_state, model)
+        assert model != self.model
+        super().set_state(new_state, self.model)
+
+    @override
+    def update(self, dt: float) -> None:
+        self.get_model_state(self.model).update(dt)
+
+    @override
+    def _create_state(self,
+                      name: str,
+                      default: Type[MovementState],
+                      *args: object,
+                      **kwargs: object,
+                      ) -> MovementState:
+
+        cls = _get_state_cls(name, default)
+        return cls(name=name, machine=self, *args, **kwargs)
+
+    def handle_collision(self, dt: float) -> None:
+        self.get_model_state(self.model).handle_collision(dt)
+
+    def move_to_last_stable_ground(self, event: EventData) -> None:
+        dt: float = event.kwargs["dt"]
+        self.model.to_last_stable_ground(dt)
+
+    def set_face_direction(self, event: EventData) -> None:
+        x: UnitVector = event.kwargs.get("x", 0)
+        y: UnitVector = event.kwargs.get("y", 0)
+
+        if (direction := coordinate_to_direction((x, y))) is not None:
+            self.model.face_direction = direction
+
+    def set_unit_vectors(self, event: EventData) -> None:
+        x: UnitVector = event.kwargs.get("x", 0)
+        y: UnitVector = event.kwargs.get("y", 0)
+
+        self.model.velocity[0] = x * self.model.movement_speed
+        self.model.velocity[1] = y * self.model.movement_speed
+
+
+class HeroMovementController(MovementController):
+
+    transitions = [
+        {"trigger": "walk",
+         "source": ["idle", "walking",],
+         "dest": "walking",
+         "before": ["set_unit_vectors", "set_face_direction",]},
+
+        {"trigger": "stop",
+         "source": ["idle", "walking",],
+         "dest": "idle",
+         "before": ["set_unit_vectors",]},
+
+        {"trigger": "retreat",
+         "source": "*",
+         "dest": "=",
+         "before": [],
+         "after": ["move_to_last_stable_ground",]},
+
+        {"trigger": "look",
+         "source": "*",
+         "dest": "=",
+         "before": [],
+         "after": ["set_face_direction",]},
+
+        {"trigger": "immobilize",
+         "source": "*",
+         "dest": "immobile"},
+
+        {"trigger": "mobilize",
+         "source": "immobile",
+         "dest": "idle"},
+
+        {"trigger": "enter_conversation",
+         "source": "*",
+         "dest": "chatting",
+         "before": ["set_unit_vectors",]},
+
+        {"trigger": "exit_conversation",
+            "source": "chatting",
+            "dest": "idle"},
+    ]
+
+    @override
+    def _create_state(self,
+                      name: str,
+                      *args: object,
+                      **kwargs: object,
+                      ) -> MovementState:
+
+        default = HeroMovementState
+        return super()._create_state(name, default, *args, **kwargs)
+
+
+class MovementState(State):
+
+    def __init__(self,
+                 name: str | Enum,
+                 machine: MovementController,
+                 *_: object,
+                 **kwargs: object,
+                 ) -> None:
+
+        self._machine = machine
+        super().__init__(name,
+                         on_enter=kwargs.get("on_enter", None),
+                         on_exit=kwargs.get("on_exit", None))
+
+    @abstractmethod
+    def handle_collision(self, dt: float) -> None:
+        raise NotImplementedError(type(self))
+
+    @abstractmethod
+    def update(self, dt: float) -> None:
+        raise NotImplementedError(type(self))
+
 
 class HeroMovementState(MovementState):
 
-    def process_collision(self, dt: float) -> None:
+    @override
+    def handle_collision(self, dt: float) -> None:
         self._machine.trigger("retreat", dt=dt)
 
+    @override
     def update(self, dt: float) -> None:
         pass
-
-    def _get_direction_from_keypress(self) -> tuple[UnitVector, UnitVector]:
-        pressed = pg.key.get_pressed()
-        x: UnitVector = 0
-        y: UnitVector = 0
-
-        if any(pressed[key] for key in keybind.UP):
-            y = -1
-        elif any(pressed[key] for key in keybind.DOWN):
-            y = 1
-
-        if any(pressed[key] for key in keybind.LEFT):
-            x = -1
-        elif any(pressed[key] for key in keybind.RIGHT):
-            x = 1
-
-        return x, y
 
 
 class IdleState(HeroMovementState):
 
+    @override
     def update(self, dt: float) -> None:
         super().update(dt)
-        x, y = self._get_direction_from_keypress()
+
+        x, y = get_coordinate_from_pressed()
         if x or y:
             self._machine.trigger("walk", x=x, y=y)
 
 
 class WalkingState(HeroMovementState):
 
-    def __init__(self, name: str | Enum, machine: MovementController, *args: Any, **kwargs: Any) -> None:
+    def __init__(self,
+                 name: str | Enum,
+                 machine: MovementController,
+                 *args: object,
+                 **kwargs: object,
+                 ) -> None:
+
         super().__init__(name, machine, *args, **kwargs)
         self._x: UnitVector = 0
         self._y: UnitVector = 0
 
+    @override
     def update(self, dt: float) -> None:
         super().update(dt)
-        x, y = self._get_direction_from_keypress()
+
+        x, y = get_coordinate_from_pressed()
 
         if not x and not y:
-            # A temporary hack to resolve possible collisions before getting into Idle state.
+            # A hack to handle possible collisions before entering the Idle state
+            # (which does not know how to deal with collisions).
             self._machine.trigger("retreat", dt=dt)
             self._x = x
             self._y = y
             self._machine.trigger("stop")
-        else:
-            if not (x == self._x and y == self._y):
-                self._x = x
-                self._y = y
-                self._machine.trigger("walk", x=x, y=y)
+
+        elif not (x == self._x and y == self._y):
+            self._x = x
+            self._y = y
+            self._machine.trigger("walk", x=x, y=y)
 
 
 class ImmobileState(HeroMovementState):
 
+    @override
     def update(self, dt: float) -> None:
         super().update(dt)
-        x, y = self._get_direction_from_keypress()
+
+        x, y = get_coordinate_from_pressed()
         if x or y:
             self._machine.trigger("look", x=x, y=y)
 
@@ -240,75 +331,137 @@ class ChattingState(HeroMovementState):
     ...
 
 
-class HeroMovementController(MovementController):
+class NPCMovementController(MovementController):
 
     transitions = [
-        {"trigger": "walk", "source": ["idle", "walking"], "dest": "walking", "before": [
-            "_set_model_unit_vectors_event", "_set_model_face_direction_event"]},
+        {"trigger": "stop_idling",
+         "source": "npc_idle",
+         "dest": "npc_planning",
+         "before": [],
+         "after": ["reset_state",]},
 
-        {"trigger": "stop", "source": ["idle", "walking"], "dest": "idle", "before": [
-            "_set_model_unit_vectors_event",]},
+        {"trigger": "wander",
+         "source": ["npc_planning", "npc_idle",],
+         "dest": "npc_wandering",
+         "before": ["set_unit_vectors", "set_face_direction",],
+         "after": ["reset_state",]},
 
-        {"trigger": "retreat", "source": "*", "dest": "=", "before": [
-        ], "after": ["_move_model_to_last_stable_ground_event"]},
+        {"trigger": "stop",
+         "source": ["npc_idle", "npc_wandering",],
+         "dest": "npc_idle",
+         "before": ["set_unit_vectors",]},
 
-        {"trigger": "look", "source": "*", "dest": "=", "before": [],
-            "after": ["_set_model_face_direction_event"]},
+        {"trigger": "retreat",
+         "source": "*",
+         "dest": "npc_idle",
+         "before": [],
+         "after": ["move_to_last_stable_ground", "stop",]},
 
-        {"trigger": "immobilize", "source": "*", "dest": "immobile"},
+        {"trigger": "look",
+         "source": "*",
+         "dest": "=",
+         "before": [],
+         "after": ["set_face_direction",]},
 
+        {"trigger": "change_plans",
+         "source": ["npc_idle", "npc_wandering",],
+         "dest": "npc_planning",
+         "before": [],
+         "after": ["soft_reset_state",]},
 
-        {"trigger": "mobilize", "source": "immobile", "dest": "idle"},
-        {"trigger": "enter_conversation", "source": "*", "dest": "chatting"},
-        {"trigger": "exit_conversation", "source": "chatting", "dest": "idle"},
+        {"trigger": "enter_conversation",
+         "source": "*",
+         "dest": "npc_chatting",
+         "before": ["set_unit_vectors",]},
 
+        {"trigger": "exit_conversation",
+            "source": "npc_chatting",
+            "dest": "npc_idle"},
     ]
 
-    def _create_state(self, name: str, *args: object, **kwargs: object) -> HeroMovementState:
-        default = HeroMovementState
+    def reset_state(self, event: EventData) -> None:
+        self.get_model_state(self.model).reset()
+
+    def soft_reset_state(self, event: EventData) -> None:
+        state = self.get_model_state(self.model)
+        assert isinstance(state, NPCPlanningState)
+        state.soft_reset()
+
+    @override
+    def _create_state(self,
+                      name: str,
+                      *args: object,
+                      **kwargs: object,
+                      ) -> None:
+
+        default = NPCMovementState
         return super()._create_state(name, default, *args, **kwargs)
 
 
 class NPCMovementState(MovementState):
 
-    def process_collision(self, dt: float) -> None:
+    @override
+    def handle_collision(self, dt: float) -> None:
         self._machine.trigger("retreat", dt=dt)
 
-    def reset(self) -> None:
-        raise NotImplementedError(type(self), self.name)
-
+    @override
     def update(self, dt: float) -> None:
         pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        raise NotImplementedError(type(self), self.name)
 
 
 class NPCIdleState(NPCMovementState):
 
-    def __init__(self, name: str | Enum, machine: NPCMovementController, *args: Any, **kwargs: Any) -> None:
-        self._duration = kwargs.get("duration", None)
-        self._timer = self._duration
-        super().__init__(name, machine, *args, **kwargs)
+    def __init__(self,
+                 name: str | Enum,
+                 machine: NPCMovementController,
+                 *args: object,
+                 **kwargs: object,
+                 ) -> None:
 
+        super().__init__(name, machine, *args, **kwargs)
+        self._duration: float | None = kwargs.get("duration", None)
+        self._timer = self._duration
+
+    @override
     def update(self, dt: float) -> None:
+        super().update(dt)
+
         if self._timer is None:
             return
+
         self._timer -= dt
+
         if self._timer <= 0:
             self._machine.trigger("stop_idling")
 
+    @override
     def reset(self) -> None:
         self._timer = self._duration
 
 
 class NPCPlanningState(NPCMovementState):
 
-    def __init__(self, name: str | Enum, machine: NPCMovementController, *args: Any, **kwargs: Any) -> None:
-        self._duration = kwargs["duration"]
-        self._duration_after_block = kwargs["duration_after_block"]
+    def __init__(self,
+                 name: str | Enum,
+                 machine: NPCMovementController,
+                 *args: object,
+                 **kwargs: object,
+                 ) -> None:
+
+        super().__init__(name, machine, *args, **kwargs)
+        self._duration: float = kwargs["duration"]
+        self._duration_after_block: float = kwargs["duration_after_block"]
         self._timer = self._duration
         self._blocked: set[Direction] = set()
-        super().__init__(name, machine, *args, **kwargs)
 
+    @override
     def update(self, dt: float) -> None:
+        super().update(dt)
+
         self._timer -= dt
 
         if self._timer > 0:
@@ -322,12 +475,13 @@ class NPCPlanningState(NPCMovementState):
 
         direction = random.choice(tuple(available))
         self._blocked.add(direction)
-        x, y = CoordDirTranslator.inv[direction.value]
+        x, y = direction_to_coordinate(direction)
         self._machine.trigger("wander", x=x, y=y)
 
+    @override
     def reset(self) -> None:
         self._timer = self._duration
-        self._blocked = set()
+        self._blocked.clear()
 
     def soft_reset(self) -> None:
         self._timer = self._duration_after_block
@@ -335,25 +489,31 @@ class NPCPlanningState(NPCMovementState):
 
 class NPCWanderingState(NPCMovementState):
 
-    def __init__(self, name: str | Enum, machine: NPCMovementController, *args: Any, **kwargs: Any) -> None:
-        self._duration = kwargs["duration"]
+    def __init__(self,
+                 name: str | Enum,
+                 machine: NPCMovementController,
+                 *args: object,
+                 **kwargs: object,
+                 ) -> None:
+
+        super().__init__(name, machine, *args, **kwargs)
+        self._duration: float = kwargs["duration"]
         self._timer = self._duration
         self._has_moved = False
-        super().__init__(name, machine, *args, **kwargs)
 
-    def process_collision(self, dt: float) -> None:
-        super().process_collision(dt)
+    @override
+    def handle_collision(self, dt: float) -> None:
+        super().handle_collision(dt)
 
         if self._has_moved:
             self._machine.trigger("stop")
         else:
             self._machine.trigger("change_plans")
 
-    def reset(self) -> None:
-        self._timer = self._duration
-        self._has_moved = False
-
+    @override
     def update(self, dt: float) -> None:
+        super().update(dt)
+
         self._timer -= dt
 
         if not self._has_moved and self._duration > self._timer + dt:
@@ -362,51 +522,15 @@ class NPCWanderingState(NPCMovementState):
         if self._timer <= 0:
             self._machine.trigger("stop")
 
+    @override
+    def reset(self) -> None:
+        self._timer = self._duration
+        self._has_moved = False
+
 
 class NPCChattingState(NPCMovementState):
 
     ...
-
-
-class NPCMovementController(MovementController):
-
-    transitions = [
-        {"trigger": "stop_idling", "source": "npc_idle", "dest": "npc_planning",
-            "before": [], "after": ["_reset_current_state_event"]},
-
-        {"trigger": "wander", "source": ["npc_planning", "npc_idle"], "dest": "npc_wandering", "before": [
-            "_set_model_unit_vectors_event", "_set_model_face_direction_event"], "after": ["_reset_current_state_event"]},
-
-        {"trigger": "stop", "source": ["npc_idle", "npc_wandering"], "dest":"npc_idle", "before": [
-            "_set_model_unit_vectors_event"]},
-
-        {"trigger": "retreat", "source": "*", "dest": "npc_idle", "before": [
-        ], "after":["_move_model_to_last_stable_ground_event", "stop"]},
-
-        {"trigger": "look", "source": "*", "dest": "=", "before": [],
-            "after":["_set_model_face_direction_event"]},
-
-        {"trigger": "change_plans", "source": ["npc_idle", "npc_wandering"], "dest": "npc_planning",
-            "before": [], "after": ["_soft_reset_current_state_event"]},
-
-        {"trigger": "enter_conversation", "source": "*", "dest": "npc_chatting",
-            "before": [], "after": []},
-
-        {"trigger": "exit_conversation", "source": "npc_chatting", "dest": "npc_idle",
-            "before": [], "after": []},
-    ]
-
-    def _reset_current_state_event(self, event: EventData) -> None:
-        self.get_model_state(self.model).reset()
-
-    def _soft_reset_current_state_event(self, event: EventData) -> None:
-        state = self.get_model_state(self.model)
-        assert isinstance(state, NPCPlanningState)
-        state.soft_reset()
-
-    def _create_state(self, name: str, *args: object, **kwargs: object) -> NPCMovementState:
-        default = NPCMovementState
-        return super()._create_state(name, default, *args, **kwargs)
 
 
 class MovementStateType(Enum):
@@ -421,7 +545,7 @@ class MovementStateType(Enum):
     NPC_CHATTING = NPCChattingState
 
 
-class MovementControllerType(Enum):
+class CharacterType(Enum):
 
     NPC = NPCMovementController
     HERO = HeroMovementController
@@ -432,3 +556,21 @@ def _get_state_cls(state: str, default: Type[MovementState]) -> Type[MovementSta
         return MovementStateType[state.upper()].value
     except KeyError:
         return default
+
+
+def get_coordinate_from_pressed() -> Coordinate:
+    pressed = pg.key.get_pressed()
+    x: UnitVector = 0
+    y: UnitVector = 0
+
+    if any(pressed[key] for key in keybind.UP):
+        y = -1
+    elif any(pressed[key] for key in keybind.DOWN):
+        y = 1
+
+    if any(pressed[key] for key in keybind.LEFT):
+        x = -1
+    elif any(pressed[key] for key in keybind.RIGHT):
+        x = 1
+
+    return x, y

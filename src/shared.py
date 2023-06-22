@@ -1,16 +1,21 @@
-
+import pathlib
+from abc import abstractmethod
 from enum import Enum
-from typing import Any, TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar
 
 from pygame import Surface
 
-from . import tuple_math
+# TODO:
+# import tuple_math
+from src import tuple_math
+
+Path: TypeAlias = str | pathlib.Path
 
 T = TypeVar("T")
 pair: TypeAlias = tuple[T, T]
 
 
-def no_op(*args: Any, **kwargs: Any) -> None:
+def no_op(*args: object, **kwargs: object) -> None:
     pass
 
 
@@ -21,12 +26,18 @@ def build_transparent_surface(size: pair[int]) -> Surface:
 
 
 def calculate_subsurface_size(surface: Surface, padding: tuple[int, int, int, int]) -> pair[int]:
-    for pad in padding:
-        assert pad >= 0
+    for p in padding:
+        assert p >= 0
 
-    absolute_size = surface.get_size()
-    return tuple_math.sub(absolute_size,
+    abs_size = surface.get_size()
+    return tuple_math.sub(surface.get_size(),
                           (padding[0] + padding[2], padding[1] + padding[3]))
+
+
+class Controller:
+
+    @abstractmethod
+    def update(self, dt: float) -> None: ...
 
 
 class Direction(Enum):

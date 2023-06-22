@@ -5,7 +5,10 @@ import pytmx
 from lupa import LuaRuntime
 from pygame import Rect
 
-from ..sprites import SpriteKeeper
+# TODO:
+# from sprites import SpriteKeeper
+from src.sprites import SpriteKeeper
+
 from .adventure_map import (
     AdventureMap,
     CharacterTriggerZone,
@@ -65,12 +68,12 @@ class MapLoader:
             trigger = lua.execute(obj.properties[TRIGGER_PROPERTY])
             trigger_zones.append(TriggerZone(rect=rect, trigger=trigger))
         # Loaded NPCs are also treated as walking trigger zones.
-        for char in new_map.characters:
-            # NOTE: You can use the entire char rect as a trigger rect instead,
+        for character in new_map.characters:
+            # NOTE: You can use the entire character rect as a trigger rect instead,
             # or even create some sort of a trigger rect.
-            rect = char.entity.collision_box
-            trigger = char.trigger
-            trigger_zones.append(CharacterTriggerZone(character=char))
+            rect = character.entity.collision_box
+            trigger = character.trigger
+            trigger_zones.append(CharacterTriggerZone(character=character))
         new_map.set_trigger_zones(trigger_zones)
 
         return new_map

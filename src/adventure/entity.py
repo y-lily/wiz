@@ -7,12 +7,18 @@ from pygame import Rect, Surface
 from pygame.sprite import Sprite
 from typing_extensions import override
 
+# TODO:
+# import tuple_math
+# from shared import Direction, pair
+# from sprites import Animation
+from src import tuple_math
+from src.shared import Direction, pair
+from src.sprites import Animation
+
 if TYPE_CHECKING:
     from .adventure_map import TriggerZone
 
-from ..sprites import Animation
-from .blueprint import PositionBlueprint
-from .shared import Direction
+from .blueprint import Position
 
 COLLISION_BOX_WIDTH_RATIO = 0.25
 COLLISION_BOX_HEIGHT_RATIO = 0.25
@@ -20,35 +26,34 @@ COLLISION_BOX_HEIGHT_RATIO = 0.25
 
 class Entity(Sprite):
 
+    _position: list[float]
+
     def __init__(self,
-                 *args: object,
+                 *,
                  image: Surface,
-                 position: PositionBlueprint | None = None,
-                 **kwargs: object,
+                 position: Position | None = None,
                  ) -> None:
 
         super().__init__()
         self.image = image
-        self.rect: Rect = image.get_rect()
-        self._position: list[float] = [position["x"],
-                                       position["y"]] if position is not None else list(self.rect.topleft)
+        self.rect = image.get_rect()
+        self._position = [position["x"],
+                          position["y"]] if position is not None else [0, 0]
         self._match_position()
 
     @property
-    def position(self) -> tuple[float, float]:
-        return (self._position[0], self._position[1])
+    def position(self) -> pair[int]:
+        return tuple_math.intify(self._position)
 
     def set_position(self, x: int, y: int) -> None:
         self._position = [x, y]
         self._match_position()
 
     def update(self, dt: float) -> None:
-        # self._match_position()
         pass
 
     def _match_position(self) -> None:
-        self.rect.topleft = (int(self._position[0]),
-                             int(self._position[1]))
+        self.rect.topleft = self.position
 
 
 class MovingEntity(Entity):
@@ -61,7 +66,7 @@ class MovingEntity(Entity):
                  face_direction: str | Direction,
                  frame: int = 0,
                  image: Surface | None = None,
-                 position: PositionBlueprint | None = None,
+                 position: Position | None = None,
                  **kwargs: object,
                  ) -> None:
 

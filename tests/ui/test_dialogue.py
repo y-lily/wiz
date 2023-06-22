@@ -4,7 +4,9 @@ import pygame as pg
 from mock_app import MockApp, create_screen
 from test_textbox import TEXT_SAMPLE_1, TEXT_SAMPLE_2
 
-from src.sprites.sprite_keeper import SpriteKeeper
+# TODO:
+# from sprites import SpriteKeeper
+from src.sprites import SpriteKeeper
 from src.ui import UI, Dialogue, PanelBuilder
 from src.ui.widget import WidgetTrigger
 

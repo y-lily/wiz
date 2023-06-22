@@ -3,8 +3,10 @@ from __future__ import annotations
 import pygame as pg
 from pygame import Surface
 
-from src.ui import UI, tuple_math
-from src.ui.shared import pair
+from shared import pair
+from src.ui import UI
+
+from . import tuple_math
 
 
 def create_screen(size: pair[int]) -> Surface:

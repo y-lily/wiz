@@ -3,9 +3,13 @@ from typing import Sequence
 import pygame as pg
 from pygame import Surface
 
-from ..sprites import SpriteKeeper
-from . import tuple_math
-from .shared import pair
+# TODO:
+# import tuple_math
+# from shared import pair
+# from sprites import SpriteKeeper
+from src import tuple_math
+from src.shared import pair
+from src.sprites import SpriteKeeper
 
 
 class Panel(Surface):

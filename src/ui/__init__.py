@@ -4,7 +4,6 @@ from .dialogue import Dialogue
 from .panel import Panel, PanelBuilder
 from .progress_bar import ProgressBar
 from .selector import Selector
-from .shared import pair
 from .textbox import Textbox
 from .widget import UI, Widget
 from .widget_builder import WidgetBuilder
@@ -16,7 +15,6 @@ __all__ = [
     "Dialogue",
     "DialogueWidget",
     "FadingWidget",
-    "pair",
     "Panel",
     "PanelBuilder",
     "ProgressBar",

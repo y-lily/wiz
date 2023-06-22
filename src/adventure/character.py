@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from pygame.event import Event
+# TODO:
+# from shared import Controller
+from src.shared import Controller
 
 from .blueprint import AdventureMapTrigger
 from .character_controller import MovementController
 from .entity import MovingEntity
-from .shared import Controller
 
 
 class Character:

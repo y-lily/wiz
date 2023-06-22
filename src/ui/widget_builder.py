@@ -1,7 +1,10 @@
 from pygame import Color
 from pygame.freetype import Font, SysFont
 
-from ..sprites import SpriteKeeper, SpriteSheet
+# TODO:
+# from sprites import SpriteKeeper, SpriteSheet
+from src.sprites import SpriteKeeper, SpriteSheet
+
 from .blueprint import (
     AtlasBlueprint,
     DialogueBlueprint,
@@ -23,12 +26,12 @@ from .textbox import Textbox
 class WidgetBuilder:
 
     def __init__(self,
-                 keeper: SpriteKeeper,
+                 sprite_keeper: SpriteKeeper,
                  panel_path: str | None = None,
                  ) -> None:
 
-        self._keeper = keeper
-        self._panel_builder = PanelBuilder(keeper, panel_path)
+        self._sprite_keeper = sprite_keeper
+        self._panel_builder = PanelBuilder(sprite_keeper, panel_path)
 
     def build_textbox(self, blueprint: TextboxBlueprint) -> Textbox:
         bg = self.build_panel(blueprint.bg)
@@ -111,4 +114,4 @@ class WidgetBuilder:
         return font
 
     def build_atlas(self, blueprint: AtlasBlueprint) -> SpriteSheet:
-        return self._keeper.sprite(blueprint.source, blueprint.alpha)
+        return self._sprite_keeper.sprite(blueprint.source, blueprint.alpha)

@@ -5,7 +5,10 @@ from typing import Generic, TypeVar
 
 from typing_extensions import override
 
-from .shared import Direction
+# TODO:
+# from shared import Direction
+from src.shared import Direction
+
 from .textbox import Textbox
 from .widget import Widget
 

@@ -6,13 +6,12 @@ import pytest
 from mock_app import MockApp, create_screen
 from pygame import Surface, freetype
 from pygame.freetype import Font, SysFont
-from pytest_lazyfixture import lazy_fixture
 
-from src.sprites.sprite_keeper import SpriteKeeper
+# TODO:
+# from sprites import SpriteKeeper
+from src.sprites import SpriteKeeper
 from src.ui import UI, Panel, PanelBuilder, Textbox
-from src.ui.decorators import AnimatedTextbox, AutoscrollingTextbox, FadingWidget
-from src.ui.shared import Direction
-from src.ui.textbox import TextSprite
+from src.ui.decorators import AnimatedTextbox
 from src.ui.widget import WidgetTrigger
 
 TEXT_SAMPLE_1 = ('"I can feel there is someone hiding behind the curtains."\n '

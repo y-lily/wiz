@@ -4,8 +4,12 @@ from pygame.event import Event
 from pygame.freetype import Font, SysFont
 from typing_extensions import override
 
-from . import keybind, shared
-from .shared import Direction, pair
+# TODO:
+# import keybind, shared
+# from shared import Direction, pair
+from src import keybind, shared
+from src.shared import Direction, pair
+
 from .textbox import TextSprite, create_default_font
 from .widget import Widget, WidgetSprite, WidgetTrigger
 
