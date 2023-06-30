@@ -75,6 +75,13 @@ class Game:
 
         while self.state != GameState.FINISHED:
             dt = clock.tick() / 1000.0
+
+            # Detect abnormally high dt values (caused, for instance, by PC freezes) and dismiss them
+            # since they may lead to various bugs like characters jumping over walls.
+            if dt > 0.05:
+                print(f"Warning, dt = {dt} has been dismissed!")
+                continue
+
             self.update(dt)
             self.draw()
             pg.display.update()

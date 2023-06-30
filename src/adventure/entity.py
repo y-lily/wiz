@@ -24,6 +24,9 @@ COLLISION_BOX_WIDTH_RATIO = 0.25
 COLLISION_BOX_HEIGHT_RATIO = 0.25
 
 
+MOVEMENT_SPEED_CAP = 1500
+
+
 class Entity(Sprite):
 
     _position: list[float]
@@ -99,6 +102,7 @@ class MovingEntity(Entity):
 
         self._animations = animations
         self._movement_speed = movement_speed
+        self._ensure_valid_ms()
         self._velocity: list[float] = [0, 0]
 
         self._active_zones: set[TriggerZone] = set()
@@ -131,6 +135,11 @@ class MovingEntity(Entity):
     def movement_speed(self) -> float:
         return self._movement_speed
 
+    @movement_speed.setter
+    def movement_speed(self, new_value: float) -> None:
+        self._movement_speed = new_value
+        self._ensure_valid_ms()
+
     def find_collision(self, zones: Sequence[Rect]) -> int:
         return self._collision_box.collidelist(zones)
 
@@ -146,6 +155,12 @@ class MovingEntity(Entity):
         self._position[0] += self._velocity[0] * dt
         self._position[1] += self._velocity[1] * dt
         self._match_position()
+
+    def _ensure_valid_ms(self) -> None:
+        if self._movement_speed > MOVEMENT_SPEED_CAP:
+            print(
+                f"Warning, movement speed = {self._movement_speed} has been reduced to {MOVEMENT_SPEED_CAP}!")
+            self._movement_speed = MOVEMENT_SPEED_CAP
 
     @override
     def _match_position(self) -> None:
