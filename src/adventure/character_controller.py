@@ -564,13 +564,13 @@ def get_coordinate_from_pressed() -> Coordinate:
     y: UnitVector = 0
 
     if any(pressed[key] for key in keybind.UP):
-        y = -1
-    elif any(pressed[key] for key in keybind.DOWN):
-        y = 1
+        y -= 1
+    if any(pressed[key] for key in keybind.DOWN):
+        y += 1
 
     if any(pressed[key] for key in keybind.LEFT):
-        x = -1
-    elif any(pressed[key] for key in keybind.RIGHT):
-        x = 1
+        x -= 1
+    if any(pressed[key] for key in keybind.RIGHT):
+        x += 1
 
     return x, y
