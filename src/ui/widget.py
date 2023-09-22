@@ -4,16 +4,15 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, ClassVar
 
 import pygame as pg
+import tuple_math
 from pygame import Rect, Surface
 from pygame.sprite import OrderedUpdates, Sprite
 from transitions import core
+from tuple_math import pair
 from typing_extensions import override
 
-# TODO:
-# import shared, tuple_math
-# from shared import no_op, pair
-from src import shared, tuple_math
-from src.shared import no_op, pair
+from src import shared
+from src.shared import no_op
 
 
 class WidgetStack(ABC):

@@ -3,9 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Mapping
 
-# TODO:
-# from shared import pair
-from src.shared import pair
+from tuple_math import pair
 
 if TYPE_CHECKING:
     from .widget import WidgetTrigger

@@ -3,16 +3,13 @@ from abc import abstractmethod
 from enum import Enum
 from typing import TypeAlias, TypeVar
 
+import tuple_math
 from pygame import Surface
-
-# TODO:
-# import tuple_math
-from src import tuple_math
+from tuple_math import pair
 
 Path: TypeAlias = str | pathlib.Path
 
 T = TypeVar("T")
-pair: TypeAlias = tuple[T, T]
 
 
 def no_op(*args: object, **kwargs: object) -> None:
@@ -29,7 +26,6 @@ def calculate_subsurface_size(surface: Surface, padding: tuple[int, int, int, in
     for p in padding:
         assert p >= 0
 
-    abs_size = surface.get_size()
     return tuple_math.sub(surface.get_size(),
                           (padding[0] + padding[2], padding[1] + padding[3]))
 

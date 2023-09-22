@@ -1,14 +1,10 @@
 from typing import Sequence
 
 import pygame as pg
+import tuple_math
 from pygame import Surface
+from tuple_math import pair
 
-# TODO:
-# import tuple_math
-# from shared import pair
-# from sprites import SpriteKeeper
-from src import tuple_math
-from src.shared import pair
 from src.sprites import SpriteKeeper
 
 

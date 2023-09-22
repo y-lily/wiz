@@ -3,14 +3,11 @@ from typing import Any, ClassVar
 
 import pygame as pg
 import pytest
+import tuple_math
 from mock_app import MockApp, create_screen
 from pygame import Surface
 from pytest_lazyfixture import lazy_fixture
 
-# TODO:
-# from sprites import SpriteKeeper
-# import tuple_math
-from src import tuple_math
 from src.sprites import SpriteKeeper
 from src.ui import UI, FadingWidget, Panel, PanelBuilder, Widget
 from src.ui.widget import WidgetTrigger

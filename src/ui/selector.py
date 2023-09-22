@@ -3,17 +3,16 @@ from __future__ import annotations
 from typing import ClassVar, Iterable, assert_never
 
 import pygame as pg
+import tuple_math
 from pygame import Surface
 from pygame.event import Event
 from pygame.freetype import Font
 from pygame.sprite import OrderedUpdates
+from tuple_math import pair
 from typing_extensions import override
 
-# TODO:
-# import keybind, shared, tuple_math
-# from shared import Direction, pair
-from src import keybind, shared, tuple_math
-from src.shared import Direction, pair
+from src import keybind, shared
+from src.shared import Direction
 
 from .dialogue import DialogueSprite
 from .observer import ListEvent, ListEventType, ListPublisher, Subscriber

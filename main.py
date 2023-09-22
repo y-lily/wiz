@@ -6,9 +6,6 @@ import pygame as pg
 
 from src.adventure import MapLoader
 from src.game import Game
-
-# TODO:
-# from sprites import SpriteKeeper
 from src.sprites import SpriteKeeper
 
 RESOURCE_DIR = pathlib.Path(__file__).parent / "res"

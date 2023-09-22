@@ -3,16 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Sequence
 
 import pygame as pg
+import tuple_math
 from pygame import Rect, Surface
 from pygame.sprite import Sprite
+from tuple_math import pair
 from typing_extensions import override
 
-# TODO:
-# import tuple_math
-# from shared import Direction, pair
-# from sprites import Animation
-from src import tuple_math
-from src.shared import Direction, pair
+from src.shared import Direction
 from src.sprites import Animation
 
 if TYPE_CHECKING:

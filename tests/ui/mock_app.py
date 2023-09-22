@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import pygame as pg
+import tuple_math
 from pygame import Surface
+from tuple_math import pair
 
-from shared import pair
 from src.ui import UI
-
-from . import tuple_math
 
 
 def create_screen(size: pair[int]) -> Surface:

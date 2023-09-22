@@ -9,14 +9,11 @@ from typing import TYPE_CHECKING, Literal, Mapping, Type, TypeAlias
 import pygame as pg
 from bidict import bidict
 from transitions import EventData, Machine, State, core
+from tuple_math import pair
 from typing_extensions import override
 
-# TODO:
-# import keybind
-# from shared import Controller, Direction, pair
-# from sprites import Animation
 from src import keybind
-from src.shared import Controller, Direction, pair
+from src.shared import Controller, Direction
 from src.sprites import Animation
 
 from .blueprint import StateBlueprint

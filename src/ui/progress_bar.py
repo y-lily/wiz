@@ -1,10 +1,6 @@
+import tuple_math
 from pygame import Surface
-
-# TODO:
-# import tuple_math
-# from shared import pair
-from src import tuple_math
-from src.shared import pair
+from tuple_math import pair
 
 from .widget import Widget, WidgetSprite, WidgetTrigger
 

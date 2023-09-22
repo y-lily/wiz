@@ -7,10 +7,7 @@ from pyscroll import BufferedRenderer, PyscrollGroup
 from pyscroll.data import TiledMapData
 from pytmx import TiledElement, TiledObject
 from transitions import core
-
-# TODO:
-# from shared import pair
-from src.shared import pair
+from tuple_math import pair
 
 from .adventure_map import AdventureMap, TriggerZone, Zone, ZoneList
 from .character import Character

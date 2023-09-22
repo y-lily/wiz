@@ -5,14 +5,12 @@ from pathlib import Path
 from typing import ClassVar, Iterable
 
 import pygame as pg
+import tuple_math
 from lupa import LuaRuntime
 from pygame import Rect, Surface
+from tuple_math import pair
 
-# TODO:
-# from shared import pair
-# import keybind, tuple_math
-# from sprites import SpriteKeeper
-from src import keybind, tuple_math
+from src import keybind
 from src.adventure import (
     AdventureMap,
     AdventureMapBlueprint,
@@ -22,7 +20,6 @@ from src.adventure import (
     MapViewer,
 )
 from src.adventure.character_controller import CharacterType
-from src.shared import pair
 from src.sprites import SpriteKeeper
 from src.ui import UI, WidgetLoader
 

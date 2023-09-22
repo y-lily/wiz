@@ -4,10 +4,6 @@ from typing import Any
 import pygame as pg
 from pygame import Surface
 
-# TODO:
-# from shared import pair
-from src.shared import pair
-
 
 class SpriteSheet:
 
@@ -21,7 +17,7 @@ class SpriteSheet:
         self.alpha = alpha
 
     @property
-    def size(self) -> pair[int]:
+    def size(self) -> tuple[int, int]:
         return self._sheet.get_size()
 
     def extract_whole(self, alpha: bool | None = None, colorkey: Any | None = None) -> Surface:
@@ -56,7 +52,7 @@ class SpriteSheet:
         return image
 
     def split(self,
-              size: pair[int],
+              size: tuple[int, int],
               alpha: bool | None = None,
               colorkey: Any | None = None,
               ) -> list[Surface]:

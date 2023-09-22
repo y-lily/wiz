@@ -4,13 +4,11 @@ import pygame as pg
 from pygame import Rect, Surface
 from pygame.event import Event
 from pygame.freetype import Font, SysFont
+from tuple_math import pair
 from typing_extensions import override
 
-# TODO:
-# import keybind, shared
-# from shared import Direction, pair
 from src import keybind, shared
-from src.shared import Direction, pair
+from src.shared import Direction
 
 from .widget import Widget, WidgetSprite, WidgetTrigger
 
